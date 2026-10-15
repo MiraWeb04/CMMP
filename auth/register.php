@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/csrf.php';
-require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/../helpers/registration.php';
 require_once __DIR__ . '/../models/Member.php';
 require_once __DIR__ . '/../models/Notification.php';
@@ -112,10 +111,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	}
 }
 
-$fellowshipPreview = fellowship_code_for_profile($fields['date_of_birth'] ?: null, $fields['gender'] ?: null);
-$fellowshipPreviewLabel = $fellowshipPreview
-	? fellowship_label_for_code($fellowshipPreview)
-	: 'Enter your date of birth and gender to preview your fellowship organization.';
 ?>
 <!doctype html>
 <html lang="en">
@@ -146,7 +141,7 @@ $fellowshipPreviewLabel = $fellowshipPreview
 				<div class="cmmp-auth-heading">
 					<span class="cmmp-auth-tag">Welcome</span>
 					<h1>Join the Church Community</h1>
-					<p>Register with your personal details so the church can place you in the correct fellowship organization.</p>
+					<p>Register with your personal details. A church administrator will review and complete your membership.</p>
 				</div>
 
 				<div class="cmmp-auth-benefits">
@@ -168,7 +163,7 @@ $fellowshipPreviewLabel = $fellowshipPreview
 						<span class="cmmp-auth-benefit-icon"><i class="fa-solid fa-users"></i></span>
 						<div>
 							<span class="cmmp-auth-benefit-title">Family Fellowship</span>
-							<span class="cmmp-auth-benefit-text">CYF, CYAF, UCM, and CWA assignment from your profile.</span>
+							<span class="cmmp-auth-benefit-text">Grow with our church family.</span>
 						</div>
 					</div>
 				</div>
@@ -222,11 +217,6 @@ $fellowshipPreviewLabel = $fellowshipPreview
 									<option value="Female" <?= $fields['gender'] === 'Female' ? 'selected' : '' ?>>Female</option>
 								</select>
 							</div>
-							<div class="col-12">
-								<label class="form-label" for="fellowship_organization_preview">Fellowship organization</label>
-								<input class="form-control" id="fellowship_organization_preview" value="<?= htmlspecialchars($fellowshipPreviewLabel, ENT_QUOTES, 'UTF-8') ?>" readonly>
-								<div class="form-text">CYF (12–29), CYAF (30–49), UCM (men 50+), CWA (women 50+). Assignment happens after admin approval.</div>
-							</div>
 							<div class="col-md-6">
 								<label class="form-label" for="username">Username</label>
 								<input class="form-control" id="username" name="username" value="<?= htmlspecialchars($fields['username'], ENT_QUOTES, 'UTF-8') ?>" required autocomplete="username" placeholder="Choose a username">
@@ -259,57 +249,5 @@ $fellowshipPreviewLabel = $fellowshipPreview
 		</section>
 	</section>
 </main>
-<script>
-(() => {
-    const dob = document.getElementById('date_of_birth');
-    const gender = document.getElementById('gender');
-    const preview = document.getElementById('fellowship_organization_preview');
-    if (!dob || !gender || !preview) {
-        return;
-    }
-    const labels = {
-        CYF: 'Christian Youth Fellowship (CYF)',
-        CYAF: 'Christian Young Adult Fellowship (CYAF)',
-        UCM: 'United Churchmen (UCM)',
-        CWA: 'Church Women\'s Association (CWA)',
-    };
-    const resolve = () => {
-        if (!dob.value || !gender.value) {
-            preview.value = 'Enter your date of birth and gender to preview your fellowship organization.';
-            return;
-        }
-        const birth = new Date(dob.value + 'T00:00:00');
-        const today = new Date();
-        let age = today.getFullYear() - birth.getFullYear();
-        const monthDiff = today.getMonth() - birth.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-            age -= 1;
-        }
-        if (age < 12) {
-            preview.value = 'No fellowship organization yet (under 12 years old).';
-            return;
-        }
-        if (age <= 29) {
-            preview.value = labels.CYF;
-            return;
-        }
-        if (age <= 49) {
-            preview.value = labels.CYAF;
-            return;
-        }
-        if (gender.value === 'Male') {
-            preview.value = labels.UCM;
-            return;
-        }
-        if (gender.value === 'Female') {
-            preview.value = labels.CWA;
-            return;
-        }
-        preview.value = 'Select Male or Female for members aged 50 and above.';
-    };
-    dob.addEventListener('change', resolve);
-    gender.addEventListener('change', resolve);
-})();
-</script>
 </body>
 </html>

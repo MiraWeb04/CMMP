@@ -18,7 +18,7 @@ function validate_member_registration_profile(array $data): array
         $errors[] = 'Last name is required.';
     }
     if ($dateOfBirth === '') {
-        $errors[] = 'Date of birth is required for fellowship organization assignment.';
+        $errors[] = 'Date of birth is required.';
     } else {
         $birthDate = DateTimeImmutable::createFromFormat('Y-m-d', $dateOfBirth);
         if (!$birthDate || $birthDate->format('Y-m-d') !== $dateOfBirth) {
@@ -29,9 +29,9 @@ function validate_member_registration_profile(array $data): array
     }
 
     if ($gender === '') {
-        $errors[] = 'Gender is required for fellowship organization assignment.';
+        $errors[] = 'Gender is required.';
     } elseif (!in_array($gender, ['Male', 'Female'], true)) {
-        $errors[] = 'Select Male or Female so the system can assign CYF, CYAF, UCM, or CWA.';
+        $errors[] = 'Select Male or Female.';
     }
 
     if ($errors === [] && $dateOfBirth !== '' && $gender !== '') {

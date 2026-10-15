@@ -158,6 +158,8 @@ function fellowship_validate_member_profile(array $data, bool $admin): array
         return [];
     }
 
+    require_once __DIR__ . '/registration.php';
+
     return validate_member_registration_profile($data);
 }
 
