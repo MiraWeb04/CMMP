@@ -1,0 +1,4 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/../../helpers/auth.php'; require_once __DIR__ . '/../../helpers/csrf.php'; require_once __DIR__ . '/../../helpers/service_request.php';
+require_role(SERVICE_REVIEW_ROLES); if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); exit('Method not allowed.'); } require_valid_csrf_token(); $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT); $status = (string) ($_POST['status'] ?? ''); if (!$id || !in_array($status, SERVICE_REQUEST_STATUSES, true)) { http_response_code(422); exit('Invalid request workflow update.'); } try { ServiceRequest::updateStatus($id, $status, (int) current_user_id(), trim((string) ($_POST['note'] ?? '')) ?: null); header('Location: view.php?id=' . $id); exit; } catch (CalendarConflictException $exception) { header('Location: view.php?id=' . $id . '&conflict=' . urlencode($exception->getMessage())); exit; }

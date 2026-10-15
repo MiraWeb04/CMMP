@@ -1,0 +1,2 @@
+<?php
+declare(strict_types=1); require_once __DIR__ . '/../../helpers/auth.php'; require_once __DIR__ . '/../../helpers/csrf.php'; require_once __DIR__ . '/../../models/Notification.php'; require_role('MEMBER'); if($_SERVER['REQUEST_METHOD']!=='POST')exit('Method not allowed.'); require_valid_csrf_token(); Notification::markRead((int)$_POST['id'],(int)current_user_id()); header('Location: index.php');exit;

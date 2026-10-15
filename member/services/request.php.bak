@@ -1,0 +1,68 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__ . '/../../helpers/auth.php';
+require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/service_request.php';
+require_role('MEMBER');
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+if (!$memberId) { http_response_code(404); exit('Your member profile has not been created yet.'); }
+$types = ServiceRequest::types(); $facilities = ServiceRequest::facilities(); $errors = []; $selectedType = (int) ($_POST['service_type_id'] ?? $_GET['service_type_id'] ?? 0); $data = service_request_input($_POST); $preferredStart = trim((string) ($_POST['preferred_start_datetime'] ?? $_GET['preferred_start_datetime'] ?? '')); $preferredEnd = trim((string) ($_POST['preferred_end_datetime'] ?? $_GET['preferred_end_datetime'] ?? '')); $facilityId = filter_var($_POST['preferred_facility_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+$selected = null; foreach ($types as $type) { if ((int) $type['id'] === $selectedType) { $selected = $type; break; } }
+$isFuneral = $selected && $selected['code'] === 'FUNERAL_SERVICE';
+$isHouseBlessing = $selected && $selected['code'] === 'HOUSE_BLESSING';
+$submitPreferredEnd = $preferredEnd;
+if ($isFuneral) {
+    $startDate = ($preferredStart !== '' && strtotime($preferredStart) !== false) ? date('Y-m-d', strtotime($preferredStart)) : '';
+    $endDate = ($preferredEnd !== '' && strtotime($preferredEnd) !== false) ? date('Y-m-d', strtotime($preferredEnd)) : '';
+    if ($startDate !== '') {
+        $preferredStart = $startDate . 'T18:00';
+        if ($endDate === '' || $endDate < $startDate) {
+            $endDate = $startDate;
+        }
+        $preferredEnd = $endDate;
+        $submitPreferredEnd = $endDate . 'T20:00';
+    }
+    if (strlen($preferredEnd) === 10) {
+        $preferredEnd .= 'T00:00';
+    }
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_valid_csrf_token();
+    if (!$selected) { $errors[] = 'Select a valid service type.'; }
+    else { $errors = validate_service_request($selected['code'], $data, $preferredStart, $submitPreferredEnd); }
+    if ($errors === []) {
+        try {
+            $requestData = ['service_type_id' => (int) $selected['id'], 'requested_by_member_id' => $memberId, 'request_number' => 'SR-' . date('Ymd') . '-' . strtoupper(bin2hex(random_bytes(4))), 'subject' => $selected['name'], 'description' => $data['additional_information'] ?? null, 'request_data' => json_encode($data, JSON_THROW_ON_ERROR), 'preferred_start_datetime' => date('Y-m-d H:i:s', strtotime($preferredStart)), 'preferred_end_datetime' => date('Y-m-d H:i:s', strtotime($submitPreferredEnd)), 'preferred_facility_id' => $facilityId, 'requested_by_member_id_user' => (int) current_user_id()];
+            ServiceRequest::create($requestData, service_request_participants($selected['code'], $data, $memberId), upload_service_documents($_FILES['documents'] ?? null, (int) current_user_id()));
+            header('Location: index.php?submitted=1'); exit;
+        } catch (CalendarConflictException $exception) { $errors[] = $exception->getMessage();
+        } catch (Throwable $exception) { error_log('CMMP service request failed: ' . $exception->getMessage()); $errors[] = 'Your request could not be submitted. Please try again.'; }
+    }
+}
+$pageTitle = 'New church service request'; $activeNav = 'services'; $breadcrumbItems = [['label' => 'Church services', 'url' => 'index.php'], ['label' => 'New request', 'url' => 'request.php']]; require __DIR__ . '/../../includes/header.php'; require __DIR__ . '/../../includes/breadcrumb.php';
+?>
+<div class="cmmp-page-header"><div><h1>New service request</h1><p>Your preferred date and time will be reviewed through scheduling before confirmation.</p></div><a class="btn btn-outline-primary" href="calendar.php<?= $selectedType ? '?service_type_id=' . (int) $selectedType : '' ?>"><i class="fa-solid fa-calendar-days me-2"></i>Choose from calendar</a></div>
+<div class="cmmp-card"><h2 class="h5 mb-4">Request details</h2><?php if ($errors !== []): ?><div class="alert alert-danger"><ul class="mb-0"><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?><form method="post" enctype="multipart/form-data" novalidate><?= csrf_field() ?><div class="row g-3"><div class="col-md-6"><label class="form-label" for="service_type_id">Service</label><select class="form-select" id="service_type_id" name="service_type_id" required onchange="this.form.submit()"><option value="">Select service</option><?php foreach ($types as $type): ?><option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option><?php endforeach; ?></select></div><div class="col-12"><div class="alert alert-light border"><?= e($selected['description'] ?? 'Select a service to view its requirements.') ?></div></div><?php if ($selected): ?><div class="col-md-6"><label class="form-label" for="preferred_start_datetime">Preferred start</label><input class="form-control" id="preferred_start_datetime" name="preferred_start_datetime" type="datetime-local" value="<?= e($preferredStart) ?>" required></div><div class="col-md-6"><label class="form-label" for="preferred_end_datetime">Preferred end</label><input class="form-control" id="preferred_end_datetime" name="preferred_end_datetime" type="datetime-local" value="<?= e($preferredEnd) ?>" required></div><?php if ($selected['code'] !== 'FUNERAL_SERVICE'): ?><div class="col-md-6"><label class="form-label" for="preferred_facility_id">Preferred venue</label><select class="form-select" id="preferred_facility_id" name="preferred_facility_id"><option value="">No preference</option><?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= $facilityId === (int) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name']) ?></option><?php endforeach; ?></select></div><?php endif; ?><?php if ($selected['code'] === 'BAPTISM'): ?><div class="col-md-6"><label class="form-label" for="applicant_name">Applicant name</label><input class="form-control" id="applicant_name" name="applicant_name" value="<?= e($data['applicant_name'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label" for="parent_guardian_name">Parent/guardian name</label><input class="form-control" id="parent_guardian_name" name="parent_guardian_name" value="<?= e($data['parent_guardian_name'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label" for="parent_guardian_contact">Parent/guardian contact</label><input class="form-control" id="parent_guardian_contact" name="parent_guardian_contact" value="<?= e($data['parent_guardian_contact'] ?? '') ?>"></div><?php elseif ($selected['code'] === 'WEDDING'): ?><div class="col-md-6"><label class="form-label" for="groom_name">Groom</label><input class="form-control" id="groom_name" name="groom_name" value="<?= e($data['groom_name'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label" for="bride_name">Bride</label><input class="form-control" id="bride_name" name="bride_name" value="<?= e($data['bride_name'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label" for="counseling_status">Counseling status</label><input class="form-control" id="counseling_status" name="counseling_status" value="<?= e($data['counseling_status'] ?? 'Not started') ?>"></div><?php elseif ($selected['code'] === 'FUNERAL_SERVICE'): ?><div class="col-md-6"><label class="form-label" for="deceased_name">Deceased person</label><input class="form-control" id="deceased_name" name="deceased_name" value="<?= e($data['deceased_name'] ?? '') ?>" required></div><div class="col-md-3"><label class="form-label" for="deceased_date_of_birth">Date of birth</label><input class="form-control" id="deceased_date_of_birth" name="deceased_date_of_birth" type="date" value="<?= e($data['deceased_date_of_birth'] ?? '') ?>"></div><div class="col-md-3"><label class="form-label" for="date_of_death">Date of death</label><input class="form-control" id="date_of_death" name="date_of_death" type="date" value="<?= e($data['date_of_death'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label" for="family_contact_name">Family/contact person</label><input class="form-control" id="family_contact_name" name="family_contact_name" value="<?= e($data['family_contact_name'] ?? '') ?>" required></div><div class="col-md-6"><label class="form-label" for="family_contact_relationship">Relationship</label><input class="form-control" id="family_contact_relationship" name="family_contact_relationship" value="<?= e($data['family_contact_relationship'] ?? '') ?>"></div><div class="col-md-6"><label class="form-label" for="funeral_location">Funeral location</label><input class="form-control" id="funeral_location" name="funeral_location" value="<?= e($data['funeral_location'] ?? '') ?>"></div><?php else: ?><div class="col-12"><label class="form-label" for="applicant_name">Applicant name</label><input class="form-control" id="applicant_name" name="applicant_name" value="<?= e($data['applicant_name'] ?? '') ?>"></div><?php endif; ?><div class="col-12"><label class="form-label" for="additional_information">Additional information</label><textarea class="form-control" id="additional_information" name="additional_information" rows="4"><?= e($data['additional_information'] ?? '') ?></textarea></div><div class="col-12"><label class="form-label" for="documents">Supporting documents</label><input class="form-control" id="documents" name="documents[]" type="file" multiple accept="application/pdf,image/jpeg,image/png"><div class="form-text">PDF, JPG, or PNG files up to 10 MB each. Documents are stored privately.</div></div><div class="col-12"><button class="btn btn-primary" type="submit">Submit request</button></div><?php endif; ?></div></form></div>
+<?php if ($isFuneral): ?>
+<script>
+(() => {
+    const startField = document.getElementById('preferred_start_datetime');
+    const endField = document.getElementById('preferred_end_datetime');
+    const startLabel = document.querySelector('label[for="preferred_start_datetime"]');
+    const endLabel = document.querySelector('label[for="preferred_end_datetime"]');
+    
+    if (startField) {
+        startField.type = 'date';
+        startField.value = (startField.value || '<?= e($preferredStart) ?>').slice(0, 10);
+        if (startLabel) startLabel.textContent = 'Preferred start date';
+    }
+    
+    if (endField) {
+        endField.type = 'date';
+        endField.value = (endField.value || '<?= e($preferredEnd) ?>').slice(0, 10);
+        if (endLabel) endLabel.textContent = 'Preferred end date';
+    }
+})();
+</script>
+<?php endif; ?>
+<?php require __DIR__ . '/../../includes/footer.php'; ?>

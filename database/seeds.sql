@@ -1,0 +1,1 @@
+-- CMMP seed data will be introduced after the initial schema is approved.

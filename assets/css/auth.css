@@ -1,0 +1,586 @@
+
+:root {
+    --cmmp-auth-page-bg: #f6f3ee;
+    --cmmp-auth-surface: #fffefb;
+    --cmmp-auth-cream: #f8f3e8;
+    --cmmp-auth-navy: #193b3e;
+    --cmmp-auth-navy-deep: #102f30;
+    --cmmp-auth-gold: #b68445;
+    --cmmp-auth-gold-soft: #f3e9d7;
+    --cmmp-auth-text: #223238;
+    --cmmp-auth-muted: #667579;
+    --cmmp-auth-border: #d8ded8;
+    --cmmp-auth-success: #2f8f68;
+    --cmmp-auth-danger: #b84d4d;
+    --cmmp-auth-danger-soft: #fff4f3;
+    --cmmp-auth-shadow: rgba(32, 50, 56, 0.13);
+}
+
+body.cmmp-auth-body {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 70% 4%, rgba(182, 132, 69, 0.08) 0%, transparent 16%),
+        radial-gradient(circle at 84% 78%, rgba(25, 59, 62, 0.08) 0%, transparent 14%),
+        var(--cmmp-auth-page-bg);
+    color: var(--cmmp-auth-text);
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.cmmp-auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 30px 16px;
+}
+
+.cmmp-auth-shell {
+    width: min(1180px, calc(100vw - 32px));
+    min-height: 640px;
+    display: flex;
+    align-items: stretch;
+    border-radius: 28px;
+    border: 1px solid rgba(32, 50, 56, 0.08);
+    background: var(--cmmp-auth-surface);
+    box-shadow: 0 20px 70px var(--cmmp-auth-shadow);
+    overflow: hidden;
+}
+
+.cmmp-auth-brand {
+    flex: 1 1 50%;
+    min-width: 0;
+    width: 50%;
+    background:
+        linear-gradient(120deg, rgba(25, 59, 62, 0.92), rgba(44, 76, 65, 0.84)),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23b68445' fill-opacity='0.1'%3E%3Cpath d='M50 150h300v100H50zM80 250h240v50H80z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    color: #fff;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.cmmp-auth-brand::before,
+.cmmp-auth-brand::after {
+    content: "";
+    position: absolute;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    border: 1px solid rgba(248, 243, 232, 0.25);
+}
+
+.cmmp-auth-brand::before {
+    left: -82px;
+    top: -68px;
+}
+
+.cmmp-auth-brand::after {
+    right: -110px;
+    bottom: -84px;
+}
+
+.cmmp-auth-brand-inner {
+    width: 100%;
+    padding: 60px 56px;
+    position: relative;
+    z-index: 1;
+}
+
+.cmmp-auth-brand-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 72px;
+}
+
+.cmmp-auth-brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cmmp-auth-gold);
+    font-size: 1.45rem;
+}
+
+.cmmp-auth-brand-top .cmmp-auth-brand-text {
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+}
+
+.cmmp-auth-brand-main {
+    max-width: 420px;
+}
+
+.cmmp-auth-brand-kicker {
+    color: var(--cmmp-auth-gold);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+.cmmp-auth-brand-title {
+    margin: 0 0 16px;
+    color: #ffffff;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: clamp(2.7rem, 2vw, 3.2rem);
+    line-height: 1.2;
+}
+
+.cmmp-auth-brand-text-lede {
+    color: rgba(255,255,255,0.84);
+    font-size: 1.05rem;
+    line-height: 1.8;
+    margin-bottom: 28px;
+}
+
+.cmmp-auth-brand-visual {
+    width: min(270px, 80%);
+    min-height: 140px;
+    margin: 28px 0 34px;
+    border-radius: 22px;
+    background-image: radial-gradient(circle, transparent 1px, rgba(255,255,255,0.05) 1px);
+    background-size: 24px 24px;
+    border: 1px solid rgba(255,255,255,0.14);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--cmmp-auth-gold);
+}
+
+.cmmp-auth-brand-visual::before {
+    content: "";
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.4);
+}
+
+.cmmp-auth-brand-visual .fa-church {
+    font-size: 4rem;
+}
+
+.cmmp-auth-brand-visual .cmmp-auth-cross {
+    width: 2px;
+    height: 54px;
+    background: var(--cmmp-auth-gold);
+    position: absolute;
+    left: calc(50% - 1px);
+    top: calc(50% - 35px);
+}
+
+.cmmp-auth-brand-visual .cmmp-auth-cross::before {
+    content: "";
+    position: absolute;
+    width: 34px;
+    height: 2px;
+    background: var(--cmmp-auth-gold);
+    left: -16px;
+    top: 24px;
+}
+
+.cmmp-auth-brand-footer {
+    color: rgba(255,255,255,0.68);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding-top: 24px;
+    border-top: 1px solid rgba(255,255,255,0.14);
+    margin-top: 36px;
+}
+
+.cmmp-auth-card-wrap {
+    flex: 1 1 50%;
+    width: 50%;
+    min-width: 0;
+    background: var(--cmmp-auth-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(18px, 3vw, 40px);
+    overflow: hidden;
+}
+
+.cmmp-auth-card {
+    width: 100%;
+    max-width: 440px;
+    min-width: 0;
+    padding: clamp(22px, 3vw, 30px);
+}
+
+.cmmp-auth-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+
+.cmmp-auth-card-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--cmmp-auth-gold-soft);
+    color: var(--cmmp-auth-navy);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.36rem;
+}
+
+.cmmp-auth-card-brand-title {
+    color: var(--cmmp-auth-navy);
+    font-size: 1.02rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+}
+
+.cmmp-auth-card-brand-subtitle {
+    color: var(--cmmp-auth-muted);
+    font-size: 0.74rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.cmmp-auth-heading {
+    margin-bottom: 22px;
+}
+
+.cmmp-auth-heading h1 {
+    color: var(--cmmp-auth-navy);
+    width: 100%;
+    max-width: 100%;
+    font-size: clamp(2rem, 2vw, 2.4rem);
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-weight: 700;
+    margin: 0 0 8px;
+    white-space: normal;
+}
+
+.cmmp-auth-heading p {
+    color: var(--cmmp-auth-muted);
+    margin: 0;
+    font-size: 0.96rem;
+}
+
+.cmmp-auth-alerts {
+    margin-bottom: 16px;
+}
+
+.cmmp-auth-alert {
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    font-size: 0.92rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cmmp-auth-alert i {
+    font-size: 1rem;
+}
+
+.cmmp-auth-alert-danger {
+    background: var(--cmmp-auth-danger-soft);
+    color: var(--cmmp-auth-danger);
+    border: 1px solid rgba(184, 77, 77, 0.2);
+}
+
+.cmmp-auth-alert-success {
+    background: var(--cmmp-auth-accent-soft, #eef6ee);
+    color: var(--cmmp-auth-success);
+    border: 1px solid rgba(47, 143, 104, 0.2);
+}
+
+.cmmp-auth-alert-info {
+    background: var(--cmmp-auth-gold-soft);
+    color: var(--cmmp-auth-navy);
+    border: 1px solid rgba(41, 74, 78, 0.16);
+}
+
+.cmmp-auth-form {
+    margin-top: 16px;
+    width: 100%;
+    max-width: 420px;
+}
+
+.cmmp-auth-form .cmmp-auth-form-row {
+    margin-bottom: 16px;
+    width: 100%;
+}
+
+.cmmp-auth-form label {
+    color: var(--cmmp-auth-text);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.cmmp-auth-form .input-group {
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(25,59,62,0.08);
+    width: 100%;
+}
+
+.cmmp-auth-form .input-group .input-group-text {
+    background: var(--cmmp-auth-cream);
+    color: var(--cmmp-auth-navy);
+    border: 1px solid var(--cmmp-auth-border);
+    border-right: 0;
+}
+
+.cmmp-auth-form .form-control {
+    min-height: 48px;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 14px;
+    color: var(--cmmp-auth-text);
+    background: #ffffff;
+    border: 1px solid var(--cmmp-auth-border);
+    font-size: 0.96rem;
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.cmmp-auth-form .input-group .form-control {
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+}
+
+.cmmp-auth-form .form-control:focus {
+    border-color: var(--cmmp-auth-navy);
+    box-shadow: 0 0 0 0.2rem rgba(25,59,62,0.12);
+}
+
+.cmmp-auth-form .form-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--cmmp-auth-muted);
+    font-size: 0.88rem;
+    margin-bottom: 16px;
+}
+
+.cmmp-auth-form .form-check-input {
+    width: 16px;
+    height: 16px;
+    border-color: var(--cmmp-auth-border);
+}
+
+.cmmp-auth-form .form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(182,132,69,0.2);
+}
+
+.cmmp-auth-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 420px;
+    min-width: 0;
+}
+
+.cmmp-auth-row a {
+    color: var(--cmmp-auth-navy);
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.cmmp-auth-row a:hover {
+    color: var(--cmmp-auth-gold);
+}
+
+.cmmp-auth-password-wrap {
+    position: relative;
+}
+
+.cmmp-auth-password-toggle {
+    height: 48px;
+    min-width: 50px;
+    background: var(--cmmp-auth-gold-soft);
+    border: 1px solid var(--cmmp-auth-border);
+    color: var(--cmmp-auth-navy);
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+    cursor: pointer;
+    transition: background .2s ease, color .2s ease;
+}
+
+.cmmp-auth-password-toggle:hover,
+.cmmp-auth-password-toggle:focus {
+    background: var(--cmmp-auth-navy);
+    color: #fff;
+}
+
+.cmmp-auth-password-toggle i {
+    font-size: 1rem;
+}
+
+.cmmp-auth-submit {
+    width: 100%;
+    min-height: 50px;
+    background: var(--cmmp-auth-navy);
+    border: 1px solid var(--cmmp-auth-navy);
+    border-radius: 14px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.95rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+}
+
+.cmmp-auth-submit:hover,
+.cmmp-auth-submit:focus {
+    background: var(--cmmp-auth-navy-deep);
+    color: #fff;
+    box-shadow: 0 10px 24px rgba(25,59,62,0.2);
+}
+
+.cmmp-auth-submit .me-2 {
+    margin-right: 8px;
+}
+
+.cmmp-auth-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.86;
+}
+
+.cmmp-auth-create-account {
+    margin-top: 24px;
+    color: var(--cmmp-auth-muted);
+    font-size: 0.9rem;
+    text-align: center;
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
+
+.cmmp-auth-create-account a {
+    color: var(--cmmp-auth-navy);
+    text-decoration: none;
+    font-weight: 800;
+}
+
+.cmmp-auth-create-account a:hover {
+    color: var(--cmmp-auth-gold);
+}
+
+.cmmp-auth-card-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--cmmp-auth-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 20px 0;
+}
+
+.cmmp-auth-card-divider::before,
+.cmmp-auth-card-divider::after {
+    content: "";
+    display: block;
+    height: 1px;
+    background: var(--cmmp-auth-border);
+    flex: 1;
+}
+
+@media (max-width: 991px) {
+    .cmmp-auth-wrapper {
+        padding: 16px;
+    }
+
+    .cmmp-auth-shell {
+        min-height: auto;
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .cmmp-auth-brand,
+    .cmmp-auth-card-wrap {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    .cmmp-auth-brand {
+        min-height: 320px;
+    }
+
+    .cmmp-auth-brand-inner {
+        padding: 40px 44px;
+    }
+
+    .cmmp-auth-brand-top {
+        margin-bottom: 30px;
+    }
+
+    .cmmp-auth-brand-main {
+        max-width: 100%;
+    }
+
+    .cmmp-auth-card {
+        padding: 28px;
+    }
+}
+
+@media (max-width: 640px) {
+    .cmmp-auth-wrapper {
+        align-items: flex-start;
+        padding: 12px;
+    }
+
+    .cmmp-auth-shell {
+        width: 100%;
+        border-radius: 18px;
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .cmmp-auth-brand {
+        flex-basis: 100%;
+    }
+
+    .cmmp-auth-card-wrap {
+        flex-basis: 100%;
+        padding: 20px;
+    }
+
+    .cmmp-auth-brand-inner {
+        padding: 30px 24px;
+    }
+
+    .cmmp-auth-brand-title {
+        font-size: 2rem;
+    }
+
+    .cmmp-auth-brand-visual {
+        min-height: 110px;
+    }
+
+    .cmmp-auth-card {
+        padding: 22px 16px;
+    }
+
+    .cmmp-auth-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 14px;
+    }
+}
