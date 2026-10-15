@@ -109,20 +109,19 @@ final class ChurchCalendar
 
     public static function bookedDates(string $rangeStart, string $rangeEnd, ?int $facilityId = null, ?string $serviceCode = null): array
     {
-        $dates = [];
-        $includeChurchEvents = $serviceCode !== 'HOUSE_BLESSING';
+        if ($serviceCode !== null && $serviceCode !== '') {
+            $dates = [];
+            foreach (self::bookingOccupiedDates($rangeStart, $rangeEnd, $facilityId, $serviceCode) as $date) {
+                $dates[$date] = true;
+            }
+            ksort($dates);
 
-        if ($includeChurchEvents) {
-            foreach (self::events($rangeStart, $rangeEnd, $facilityId) as $event) {
-                self::collectDates($dates, (string) $event['start'], (string) ($event['end'] ?? $event['start']));
-            }
-            foreach (self::eventBlockedDatesInRange($rangeStart, $rangeEnd, $serviceCode, $facilityId) as $date) {
-                $dates[$date] = true;
-            }
-        } else {
-            foreach (self::bookingOccupiedDates($rangeStart, $rangeEnd, $facilityId) as $date) {
-                $dates[$date] = true;
-            }
+            return array_keys($dates);
+        }
+
+        $dates = [];
+        foreach (self::events($rangeStart, $rangeEnd, $facilityId) as $event) {
+            self::collectDates($dates, (string) $event['start'], (string) ($event['end'] ?? $event['start']));
         }
 
         ksort($dates);
@@ -131,127 +130,51 @@ final class ChurchCalendar
     }
 
     /**
-     * Whether a church event or ministry activity on this calendar day blocks the given service.
-     */
-    public static function isServiceDateBlockedByEvents(string $serviceCode, string $date, ?int $facilityId = null): bool
-    {
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            return false;
-        }
-
-        if ($serviceCode === 'HOUSE_BLESSING') {
-            return false;
-        }
-
-        return self::publishedSchedulesOverlapDate($date, $serviceCode, $facilityId);
-    }
-
-    /**
-     * @return list<string> Y-m-d dates in range blocked for this service because of church events/activities.
-     */
-    public static function eventBlockedDatesInRange(
-        string $rangeStart,
-        string $rangeEnd,
-        ?string $serviceCode,
-        ?int $facilityId = null
-    ): array {
-        if ($serviceCode === null || $serviceCode === '' || $serviceCode === 'HOUSE_BLESSING') {
-            return [];
-        }
-
-        [$start, $end] = self::normalizeRange($rangeStart, $rangeEnd);
-        $blocked = [];
-        $first = new DateTimeImmutable($start);
-        $last = new DateTimeImmutable($end);
-        for ($date = $first->setTime(0, 0); $date <= $last->setTime(0, 0); $date = $date->modify('+1 day')) {
-            $key = $date->format('Y-m-d');
-            if (self::publishedSchedulesOverlapDate($key, $serviceCode, $facilityId)) {
-                $blocked[] = $key;
-            }
-        }
-
-        return $blocked;
-    }
-
-    private static function publishedSchedulesOverlapDate(string $date, string $serviceCode, ?int $facilityId): bool
-    {
-        $dayStart = $date . ' 00:00:00';
-        $dayEnd = $date . ' 23:59:59';
-        $anyFacility = self::serviceUsesAnyFacilityOnDate($serviceCode, $facilityId);
-
-        $eventSql = 'SELECT 1 FROM events
-                     WHERE event_status = "PUBLISHED"
-                       AND start_datetime < :day_end
-                       AND end_datetime > :day_start';
-        $parameters = ['day_start' => $dayStart, 'day_end' => $dayEnd];
-        if (!$anyFacility && $facilityId !== null && $facilityId > 0) {
-            $eventSql .= ' AND (facility_id IS NULL OR facility_id = :facility_id)';
-            $parameters['facility_id'] = $facilityId;
-        }
-        $eventSql .= ' LIMIT 1';
-
-        $eventQuery = database()->prepare($eventSql);
-        $eventQuery->execute($parameters);
-        if ($eventQuery->fetchColumn()) {
-            return true;
-        }
-
-        $activityQuery = database()->prepare(
-            'SELECT 1 FROM ministry_activities
-             WHERE activity_status IN ("PLANNED", "ONGOING")
-               AND start_datetime IS NOT NULL
-               AND start_datetime < :day_end
-               AND COALESCE(end_datetime, start_datetime) > :day_start
-             LIMIT 1'
-        );
-        $activityQuery->execute(['day_start' => $dayStart, 'day_end' => $dayEnd]);
-
-        return (bool) $activityQuery->fetchColumn();
-    }
-
-    private static function serviceUsesAnyFacilityOnDate(string $serviceCode, ?int $facilityId): bool
-    {
-        if ($facilityId !== null && $facilityId > 0) {
-            return false;
-        }
-
-        return in_array($serviceCode, ['WEDDING', 'BAPTISM', 'FUNERAL_SERVICE', 'FACILITY_RESERVATION', 'MANANITA'], true);
-    }
-
-    /**
      * @return list<string>
      */
-    private static function bookingOccupiedDates(string $rangeStart, string $rangeEnd, ?int $facilityId = null): array
-    {
+    private static function bookingOccupiedDates(
+        string $rangeStart,
+        string $rangeEnd,
+        ?int $facilityId = null,
+        ?string $serviceCode = null
+    ): array {
         [$start, $end] = self::normalizeRange($rangeStart, $rangeEnd);
         $blocked = [];
 
-        $appointmentQuery = database()->prepare(
-            'SELECT start_datetime, end_datetime
+        $appointmentSql = 'SELECT start_datetime, end_datetime
              FROM appointments
              WHERE status IN ("PENDING", "CONFIRMED")
                AND start_datetime < :end_datetime
-               AND end_datetime > :start_datetime'
-            . ($facilityId ? ' AND (facility_id IS NULL OR facility_id = :facility_id)' : '')
-        );
+               AND end_datetime > :start_datetime';
         $appointmentParams = ['start_datetime' => $start, 'end_datetime' => $end];
-        if ($facilityId) {
+        if ($facilityId !== null && $facilityId > 0) {
+            $appointmentSql .= ' AND (facility_id IS NULL OR facility_id = :facility_id)';
             $appointmentParams['facility_id'] = $facilityId;
         }
+        $appointmentQuery = database()->prepare($appointmentSql);
         $appointmentQuery->execute($appointmentParams);
         foreach ($appointmentQuery->fetchAll() as $item) {
             self::collectDates($blocked, (string) $item['start_datetime'], (string) $item['end_datetime']);
         }
 
-        $requestQuery = database()->prepare(
-            'SELECT preferred_start_datetime, preferred_end_datetime
-             FROM service_requests
-             WHERE status IN ("PENDING", "PENDING_ASSIGNMENT", "UNDER_REVIEW", "ASSIGNED", "APPROVED", "SCHEDULED", "CONFIRMED")
-               AND preferred_start_datetime IS NOT NULL
-               AND preferred_start_datetime < :end_datetime
-               AND COALESCE(preferred_end_datetime, preferred_start_datetime) > :start_datetime'
-        );
-        $requestQuery->execute(['start_datetime' => $start, 'end_datetime' => $end]);
+        $requestSql = 'SELECT preferred_start_datetime, preferred_end_datetime
+             FROM service_requests sr
+             INNER JOIN service_types st ON st.id = sr.service_type_id
+             WHERE sr.status IN ("ASSIGNED", "APPROVED", "SCHEDULED", "CONFIRMED", "COMPLETED")
+               AND sr.preferred_start_datetime IS NOT NULL
+               AND sr.preferred_start_datetime < :end_datetime
+               AND COALESCE(sr.preferred_end_datetime, sr.preferred_start_datetime) > :start_datetime
+               AND st.code <> "HOUSE_BLESSING"';
+        $requestParams = ['start_datetime' => $start, 'end_datetime' => $end];
+        if ($facilityId !== null && $facilityId > 0) {
+            $requestSql .= ' AND (sr.preferred_facility_id IS NULL OR sr.preferred_facility_id = :facility_id)';
+            $requestParams['facility_id'] = $facilityId;
+        }
+        if ($serviceCode === 'HOUSE_BLESSING') {
+            $requestSql .= ' AND st.code = "HOUSE_BLESSING"';
+        }
+        $requestQuery = database()->prepare($requestSql);
+        $requestQuery->execute($requestParams);
         foreach ($requestQuery->fetchAll() as $item) {
             self::collectDates($blocked, (string) $item['preferred_start_datetime'], (string) $item['preferred_end_datetime']);
         }

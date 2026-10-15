@@ -44,7 +44,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         </select>
     </div>
 </div>
-<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open for the service you selected. Red days have a church event, activity, or confirmed booking that conflicts. Pending requests are not shown here.</span></div>
+<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days have no confirmed booking conflict for this service. Red days are already booked. Church events appear on the calendar but do not block the whole day—you can still request a different time unless it overlaps.</span></div>
 <div class="cmmp-calendar-shell">
     <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-request-url="request.php" data-service-type-id="<?= $serviceTypeId ? (int) $serviceTypeId : '' ?>" data-service-code="<?= e($serviceCode) ?>" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
     <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>
@@ -64,12 +64,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
             if (info.dateStr < today) {
                 return;
             }
-            if (bookedDates.has(info.dateStr)) {
-                const message = document.getElementById('calendar-message');
-                if (message) {
-                    message.textContent = 'This date is not available for the selected service because of a church event or existing booking.';
-                    message.hidden = false;
-                }
+            if (bookedDates.has(info.dateStr) && !confirm('This date already has a confirmed booking for this venue or service. Continue with a different time?')) {
                 return;
             }
             const query = new URLSearchParams({preferred_date: info.dateStr});

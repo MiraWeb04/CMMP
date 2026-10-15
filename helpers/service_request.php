@@ -205,39 +205,21 @@ function validate_service_request(string $code, array $data, string $preferredSt
             $calendarFacilityId = (int) Facility::counselingOffice()['id'];
         }
 
-        $preferredDate = date('Y-m-d', strtotime($preferredStart));
-        if (ChurchCalendar::isServiceDateBlockedByEvents($code, $preferredDate, $calendarFacilityId)) {
-            $errors[] = 'The selected date has a church event or activity that conflicts with this service. Choose another date or service.';
-        } else {
-            try {
-                ChurchCalendar::assertAvailable(
-                    date('Y-m-d H:i:s', strtotime($preferredStart)),
-                    date('Y-m-d H:i:s', strtotime($preferredEnd)),
-                    $calendarFacilityId,
-                    null,
-                    null,
-                    $code
-                );
-            } catch (CalendarConflictException $exception) {
-                $errors[] = $exception->getMessage();
-            }
+        try {
+            ChurchCalendar::assertAvailable(
+                date('Y-m-d H:i:s', strtotime($preferredStart)),
+                date('Y-m-d H:i:s', strtotime($preferredEnd)),
+                $calendarFacilityId,
+                null,
+                null,
+                $code
+            );
+        } catch (CalendarConflictException $exception) {
+            $errors[] = $exception->getMessage();
         }
     }
 
     return $errors;
-}
-
-function service_facility_id_for_availability(string $code, ?int $facilityId): ?int
-{
-    if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
-        return (int) Facility::counselingOffice()['id'];
-    }
-
-    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true)) {
-        return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
-    }
-
-    return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
 }
 
 function upload_service_documents(?array $files, int $userId): array
