@@ -100,7 +100,7 @@ return [
     [
         'label' => 'Ministry & Care',
         'items' => [
-            ['key' => 'pastor-review', 'label' => 'Review Requests', 'icon' => 'fa-clipboard-check', 'url' => APP_BASE_URL . '/admin/services/', 'roles' => ['PASTOR']],
+            ['key' => 'pastor-review', 'label' => 'My Assignments', 'icon' => 'fa-clipboard-check', 'url' => APP_BASE_URL . '/pastor/services/', 'roles' => ['PASTOR']],
             ['key' => 'pastor-calendar', 'label' => 'Church Calendar', 'icon' => 'fa-calendar-check', 'url' => APP_BASE_URL . '/admin/services/calendar.php', 'roles' => ['PASTOR']],
             ['key' => 'pastor-services', 'label' => 'My Services', 'icon' => 'fa-hands-praying', 'url' => APP_BASE_URL . '/pastor/services/', 'roles' => ['PASTOR']],
             ['key' => 'pastor-appointments', 'label' => 'Appointments', 'icon' => 'fa-calendar-check', 'url' => APP_BASE_URL . '/pastor/appointments/', 'roles' => ['PASTOR']],

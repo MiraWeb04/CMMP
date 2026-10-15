@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/../services/NotificationService.php';
 
 final class Ministry
@@ -252,7 +253,31 @@ final class Ministry
     }
 
     public static function members(int $ministryId): array { return self::find($ministryId)['members'] ?? []; }
-    public static function addMember(int $ministryId, int $memberId, ?string $role): void { database()->prepare('INSERT INTO ministry_members (ministry_id, member_id, membership_role, joined_at, left_at) VALUES (:ministry_id, :member_id, :role, CURDATE(), NULL) ON DUPLICATE KEY UPDATE membership_role = VALUES(membership_role), joined_at = CURDATE(), left_at = NULL')->execute(['ministry_id' => $ministryId, 'member_id' => $memberId, 'role' => $role]); }
+    public static function addMember(int $ministryId, int $memberId, ?string $role, bool $fromFellowshipSync = false): void
+    {
+        $ministryQuery = database()->prepare('SELECT code FROM ministries WHERE id = :id LIMIT 1');
+        $ministryQuery->execute(['id' => $ministryId]);
+        $code = (string) ($ministryQuery->fetchColumn() ?: '');
+
+        if (fellowship_is_organization_code($code)) {
+            if (!$fromFellowshipSync) {
+                fellowship_assert_member_eligible($memberId, $code);
+            }
+
+            $existingFellowship = fellowship_active_code_for_member($memberId);
+            if ($existingFellowship !== null && strtoupper($existingFellowship) !== strtoupper($code)) {
+                throw new InvalidArgumentException(
+                    'This member is already assigned to ' . fellowship_label_for_code($existingFellowship) . '. Fellowship organizations cannot be changed manually.'
+                );
+            }
+        }
+
+        database()->prepare(
+            'INSERT INTO ministry_members (ministry_id, member_id, membership_role, joined_at, left_at)
+             VALUES (:ministry_id, :member_id, :role, CURDATE(), NULL)
+             ON DUPLICATE KEY UPDATE membership_role = VALUES(membership_role), joined_at = CURDATE(), left_at = NULL'
+        )->execute(['ministry_id' => $ministryId, 'member_id' => $memberId, 'role' => $role]);
+    }
     public static function removeMember(int $ministryId, int $memberId): void { database()->prepare('UPDATE ministry_members SET left_at = CURDATE() WHERE ministry_id = :ministry_id AND member_id = :member_id AND left_at IS NULL')->execute(['ministry_id' => $ministryId, 'member_id' => $memberId]); }
 
     public static function membershipIdsForMember(int $memberId): array

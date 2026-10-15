@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - CMMP</title>
+    <link rel="icon" type="image/png" href="../assets/images/uccp-logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
     <link href="../assets/css/style.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/style.css') ?>" rel="stylesheet">
@@ -78,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="cmmp-auth-side-inner">
                 <a class="cmmp-auth-brand-row" href="<?= htmlspecialchars(APP_BASE_URL, ENT_QUOTES, 'UTF-8') ?>/member-portal.php">
                     <span class="cmmp-auth-logo">
-                        <i class="fa-solid fa-church"></i>
+                        <img src="../assets/images/uccp-logo.png" alt="UCCP logo" width="56" height="56" decoding="async">
                     </span>
                     <div>
                         <span class="cmmp-auth-kicker">CMMP</span>

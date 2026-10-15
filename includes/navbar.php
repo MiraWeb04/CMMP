@@ -17,8 +17,8 @@ $notificationUnread = Notification::unreadCount((int) ($currentUser['id'] ?? 0))
 			<i class="fa-solid fa-bars"></i>
 		</button>
 		<a class="navbar-brand d-flex align-items-center gap-2" href="<?= e(APP_BASE_URL) ?>/member-portal.php">
-			<span class="cmmp-brand-mark"><i class="fa-solid fa-church"></i></span>
-			<span><strong>CMMP</strong><small class="d-block">Church Portal</small></span>
+			<?php require __DIR__ . '/brand-logo.php'; ?>
+			<span><strong>CMMP</strong><small class="d-block">UCCP Church Portal</small></span>
 		</a>
 		<div class="ms-auto d-flex align-items-center gap-2">
 			<div class="cmmp-top-search d-none d-lg-flex">

@@ -15,7 +15,8 @@ final class ChurchCalendar
         'SCHEDULED',
         'CONFIRMED',
     ];
-    private const PENDING_REQUEST_STATUSES = ['PENDING', 'PENDING_ASSIGNMENT', 'UNDER_REVIEW', 'DOCUMENTS_REQUIRED'];
+    private const BOOKED_REQUEST_STATUSES = ['ASSIGNED', 'APPROVED', 'SCHEDULED', 'CONFIRMED', 'COMPLETED'];
+    private const BOOKED_REQUEST_STATUS_SQL = '"ASSIGNED", "APPROVED", "SCHEDULED", "CONFIRMED", "COMPLETED"';
 
     public static function events(string $rangeStart, string $rangeEnd, ?int $facilityId = null): array
     {
@@ -50,10 +51,10 @@ final class ChurchCalendar
             [
                 'sql' => 'SELECT appointment_type AS title, start_datetime, end_datetime, facility_id
                           FROM appointments
-                          WHERE status IN ("PENDING", "CONFIRMED")
+                          WHERE status = "CONFIRMED"
                             AND start_datetime < :end_datetime
                             AND end_datetime > :start_datetime' . $facilityFilter,
-                'type' => 'Existing booking',
+                'type' => 'Booked',
                 'title' => 'title',
             ],
             [
@@ -61,7 +62,7 @@ final class ChurchCalendar
                                  sr.preferred_end_datetime AS end_datetime, sr.preferred_facility_id AS facility_id,
                                  sr.status AS request_status
                           FROM service_requests sr
-                          WHERE sr.status IN ("PENDING", "PENDING_ASSIGNMENT", "UNDER_REVIEW", "DOCUMENTS_REQUIRED", "ASSIGNED", "APPROVED", "SCHEDULED", "CONFIRMED")
+                          WHERE sr.status IN (' . self::BOOKED_REQUEST_STATUS_SQL . ')
                             AND sr.preferred_start_datetime IS NOT NULL
                             AND sr.preferred_start_datetime < :end_datetime
                             AND COALESCE(sr.preferred_end_datetime, sr.preferred_start_datetime) > :start_datetime
@@ -70,7 +71,7 @@ final class ChurchCalendar
                               WHERE service_request_id = sr.id
                               LIMIT 1
                             )' . str_replace('facility_id', 'preferred_facility_id', $facilityFilter),
-                'type' => 'Service request',
+                'type' => 'Booked',
                 'title' => 'title',
             ],
         ];
@@ -83,17 +84,13 @@ final class ChurchCalendar
             }
             $query->execute($queryParameters);
             foreach ($query->fetchAll() as $item) {
-                $type = $definition['type'];
-                if ($type === 'Service request' && in_array((string) ($item['request_status'] ?? ''), self::PENDING_REQUEST_STATUSES, true)) {
-                    $type = 'Pending request';
-                }
                 $events[] = [
-                    'title' => $type . ': ' . $item[$definition['title']],
+                    'title' => $definition['type'] . ': ' . $item[$definition['title']],
                     'start' => $item['start_datetime'],
                     'end' => $item['end_datetime'] ?: $item['start_datetime'],
-                    'className' => self::eventClass($type),
+                    'className' => 'cmmp-fc-event-booked',
                     'extendedProps' => [
-                        'type' => $type,
+                        'type' => $definition['type'],
                         'facility_id' => $item['facility_id'] ? (int) $item['facility_id'] : null,
                         'church_wide' => !$item['facility_id'],
                         'status' => $item['request_status'] ?? null,
@@ -103,6 +100,18 @@ final class ChurchCalendar
         }
 
         return $events;
+    }
+
+    public static function bookedDates(string $rangeStart, string $rangeEnd, ?int $facilityId = null): array
+    {
+        $dates = [];
+        foreach (self::events($rangeStart, $rangeEnd, $facilityId) as $event) {
+            self::collectDates($dates, (string) $event['start'], (string) ($event['end'] ?? $event['start']));
+        }
+
+        sort($dates);
+
+        return $dates;
     }
 
     public static function assertAvailable(
@@ -302,15 +311,17 @@ final class ChurchCalendar
         return [date('Y-m-d H:i:s', $startTimestamp), date('Y-m-d H:i:s', $endTimestamp)];
     }
 
-    private static function eventClass(string $type): string
+    private static function collectDates(array &$dates, string $start, string $end): void
     {
-        return match ($type) {
-            'Church event' => 'cmmp-fc-event-church',
-            'Church activity' => 'cmmp-fc-event-activity',
-            'Existing booking' => 'cmmp-fc-event-booking',
-            'Pending request' => 'cmmp-fc-event-pending',
-            default => 'cmmp-fc-event-request',
-        };
+        $first = new DateTimeImmutable($start);
+        $last = new DateTimeImmutable($end ?: $start);
+        if ($last < $first) {
+            $last = $first;
+        }
+
+        for ($date = $first->setTime(0, 0); $date <= $last->setTime(0, 0); $date = $date->modify('+1 day')) {
+            $dates[$date->format('Y-m-d')] = true;
+        }
     }
 
     private static function addRange(array &$blocked, ?string $start, ?string $end, string $type, string $title): void

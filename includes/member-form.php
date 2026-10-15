@@ -1,7 +1,13 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/../helpers/fellowship.php';
+
 $member = $member ?? [];
+$suggestedFellowshipCode = fellowship_code_for_profile($member['date_of_birth'] ?? null, $member['gender'] ?? null);
+$suggestedFellowshipLabel = $suggestedFellowshipCode
+    ? fellowship_label_for_code($suggestedFellowshipCode)
+    : 'Complete date of birth and gender to assign CYF, CYAF, UCM, or CWA.';
 $formAction = $formAction ?? '';
 $submitLabel = $submitLabel ?? 'Save member';
 $showStatus = $showStatus ?? true;
@@ -68,6 +74,11 @@ $memberValue = static function (string $field) use ($member): string {
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="col-md-8">
+            <label class="form-label" for="fellowship_organization_preview">Fellowship organization</label>
+            <input class="form-control" id="fellowship_organization_preview" value="<?= e($suggestedFellowshipLabel) ?>" readonly>
+            <div class="form-text">Members aged 12 and above are assigned automatically from date of birth and gender. Organizations cannot be transferred manually.</div>
+        </div>
         <div class="col-md-4">
             <label class="form-label" for="phone">Contact number</label>
             <input class="form-control" id="phone" name="phone" value="<?= $memberValue('phone') ?>" maxlength="30">
@@ -117,3 +128,55 @@ $memberValue = static function (string $field) use ($member): string {
         <a class="btn btn-outline-secondary" href="<?= e($cancelUrl ?? 'index.php') ?>">Cancel</a>
     </div>
 </form>
+<script>
+(() => {
+    const dob = document.getElementById('date_of_birth');
+    const gender = document.getElementById('gender');
+    const preview = document.getElementById('fellowship_organization_preview');
+    if (!dob || !gender || !preview) {
+        return;
+    }
+    const labels = {
+        CYF: 'Christian Youth Fellowship (CYF)',
+        CYAF: 'Christian Young Adult Fellowship (CYAF)',
+        UCM: 'United Churchmen (UCM)',
+        CWA: 'Church Women\'s Association (CWA)',
+    };
+    const resolve = () => {
+        if (!dob.value || !gender.value) {
+            preview.value = 'Complete date of birth and gender to assign CYF, CYAF, UCM, or CWA.';
+            return;
+        }
+        const birth = new Date(dob.value + 'T00:00:00');
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age -= 1;
+        }
+        if (age < 12) {
+            preview.value = 'No fellowship organization (under 12 years old).';
+            return;
+        }
+        if (age <= 29) {
+            preview.value = labels.CYF;
+            return;
+        }
+        if (age <= 49) {
+            preview.value = labels.CYAF;
+            return;
+        }
+        if (gender.value === 'Male') {
+            preview.value = labels.UCM;
+            return;
+        }
+        if (gender.value === 'Female') {
+            preview.value = labels.CWA;
+            return;
+        }
+        preview.value = 'Select Male or Female for members aged 50 and above.';
+    };
+    dob.addEventListener('change', resolve);
+    gender.addEventListener('change', resolve);
+})();
+</script>

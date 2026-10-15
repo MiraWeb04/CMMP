@@ -20,7 +20,11 @@ if ($start === '' || $end === '') {
 }
 
 try {
-    json_response(['success' => true, 'events' => ChurchCalendar::events($start, $end, $facilityId)]);
+    json_response([
+        'success' => true,
+        'events' => ChurchCalendar::events($start, $end, $facilityId),
+        'bookedDates' => ChurchCalendar::bookedDates($start, $end, $facilityId),
+    ]);
 } catch (Throwable $exception) {
     json_response(['success' => false, 'message' => $exception->getMessage()], 422);
 }

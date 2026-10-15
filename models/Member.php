@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/AuditLog.php';
 
 final class Member
@@ -156,7 +157,14 @@ final class Member
         );
         $query->execute($data);
 
-        return (int) database()->lastInsertId();
+        $memberId = (int) database()->lastInsertId();
+        fellowship_sync_member(
+            $memberId,
+            $data['date_of_birth'] ?? null,
+            $data['gender'] ?? null
+        );
+
+        return $memberId;
     }
 
     public static function update(int $id, array $data): void
@@ -180,6 +188,12 @@ final class Member
         $data['id'] = $id;
         $query = database()->prepare('UPDATE members SET ' . implode(', ', $assignments) . ' WHERE id = :id');
         $query->execute($data);
+
+        $profile = self::find($id);
+        if ($profile) {
+            fellowship_sync_member($id, $profile['date_of_birth'] ?? null, $profile['gender'] ?? null);
+        }
+
         AuditLog::record(null, 'MEMBER_UPDATED', 'MEMBER', $id);
     }
 
