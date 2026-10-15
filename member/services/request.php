@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/Member.php';
 require_once __DIR__ . '/../../models/Facility.php';
+require_once __DIR__ . '/../../models/ChurchCalendar.php';
 
 require_role('MEMBER');
 
@@ -59,6 +60,24 @@ foreach ($types as $type) {
 }
 
 $code = $selected['code'] ?? '';
+$serviceAvailability = [];
+if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1) {
+    foreach ($types as $type) {
+        $typeCode = (string) $type['code'];
+        $availabilityFacilityId = service_facility_id_for_availability(
+            $typeCode,
+            in_array($typeCode, ['FACILITY_RESERVATION', 'MANANITA'], true) ? $facilityId : null
+        );
+        $serviceAvailability[$typeCode] = !ChurchCalendar::isServiceDateBlockedByEvents(
+            $typeCode,
+            $preferredDate,
+            $availabilityFacilityId
+        );
+    }
+}
+$selectedBlockedOnDate = $code !== ''
+    && $preferredDate !== ''
+    && ($serviceAvailability[$code] ?? true) === false;
 $counselingOffice = null;
 if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
     $counselingOffice = Facility::counselingOffice();
@@ -85,6 +104,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_valid_csrf_token();
     if (!$selected) {
         $errors[] = 'Select a valid service type.';
+    } elseif (
+        $preferredDate !== ''
+        && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1
+        && ChurchCalendar::isServiceDateBlockedByEvents(
+            (string) $selected['code'],
+            $preferredDate,
+            service_facility_id_for_availability((string) $selected['code'], $facilityId)
+        )
+    ) {
+        $errors[] = 'The selected service is not available on this date because of a church event or activity.';
     } else {
         $errors = validate_service_request($selected['code'], $data, $preferredStart, $preferredEnd, $facilityId);
     }
@@ -161,9 +190,20 @@ $field = static function (array $data, string $name): string {
             <select class="form-select" id="service_type_id" name="service_type_id" required onchange="this.form.submit()">
                 <option value="">Select service</option>
                 <?php foreach ($types as $type): ?>
-                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
+                    <?php
+                    $typeCode = (string) $type['code'];
+                    $typeAvailable = $serviceAvailability === [] || ($serviceAvailability[$typeCode] ?? true);
+                    $optionLabel = (string) $type['name'];
+                    if (!$typeAvailable && $preferredDate !== '') {
+                        $optionLabel .= ' (Unavailable — church event on selected date)';
+                    }
+                    ?>
+                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?> <?= $typeAvailable ? '' : 'disabled' ?>><?= e($optionLabel) ?></option>
                 <?php endforeach; ?>
             </select>
+            <?php if ($preferredDate !== ''): ?>
+                <div class="form-text">Services marked unavailable conflict with a published church event or activity on <?= e(date('F j, Y', strtotime($preferredDate))) ?>.</div>
+            <?php endif; ?>
         </div>
         <?php if ($preferredDate !== ''): ?>
             <div class="col-md-4">
@@ -174,7 +214,13 @@ $field = static function (array $data, string $name): string {
     </form>
 </div>
 
-<?php if ($selected): ?>
+<?php if ($selected && $selectedBlockedOnDate): ?>
+<div class="alert alert-warning">
+    <?= e($selected['name']) ?> cannot be booked on <?= e(date('F j, Y', strtotime($preferredDate))) ?> because of a church event or activity. Choose another date from the calendar or pick a different service.
+</div>
+<?php endif; ?>
+
+<?php if ($selected && !$selectedBlockedOnDate): ?>
 <div class="cmmp-card">
     <p class="text-muted"><?= e($selected['description'] ?? 'Complete the service information and your preferred schedule.') ?></p>
 

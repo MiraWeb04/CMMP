@@ -70,6 +70,12 @@
             headerToolbar: options.headerToolbar || {left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth'},
             events: (info, success, failure) => {
                 const query = new URLSearchParams({start: info.startStr, end: info.endStr});
+                if (element.dataset.serviceTypeId) {
+                    query.set('service_type_id', element.dataset.serviceTypeId);
+                }
+                if (element.dataset.serviceCode) {
+                    query.set('service_code', element.dataset.serviceCode);
+                }
                 if (facility && facility.value) {
                     query.set('facility_id', facility.value);
                 }
