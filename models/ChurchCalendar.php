@@ -35,8 +35,9 @@ final class ChurchCalendar
                           WHERE event_status = "PUBLISHED"
                             AND start_datetime < :end_datetime
                             AND end_datetime > :start_datetime' . $facilityFilter,
-                'type' => 'Church event',
+                'type' => 'Booked',
                 'title' => 'title',
+                'titlePrefix' => 'Church event',
             ],
             [
                 'sql' => 'SELECT name AS title, start_datetime, end_datetime, NULL AS facility_id
@@ -45,8 +46,9 @@ final class ChurchCalendar
                             AND start_datetime IS NOT NULL
                             AND start_datetime < :end_datetime
                             AND COALESCE(end_datetime, start_datetime) > :start_datetime',
-                'type' => 'Church activity',
+                'type' => 'Booked',
                 'title' => 'title',
+                'titlePrefix' => 'Church activity',
             ],
             [
                 'sql' => 'SELECT appointment_type AS title, start_datetime, end_datetime, facility_id
@@ -56,6 +58,7 @@ final class ChurchCalendar
                             AND end_datetime > :start_datetime' . $facilityFilter,
                 'type' => 'Booked',
                 'title' => 'title',
+                'titlePrefix' => 'Booked',
             ],
             [
                 'sql' => 'SELECT sr.subject AS title, sr.preferred_start_datetime AS start_datetime,
@@ -73,6 +76,7 @@ final class ChurchCalendar
                             )' . str_replace('facility_id', 'preferred_facility_id', $facilityFilter),
                 'type' => 'Booked',
                 'title' => 'title',
+                'titlePrefix' => 'Booked',
             ],
         ];
 
@@ -84,8 +88,9 @@ final class ChurchCalendar
             }
             $query->execute($queryParameters);
             foreach ($query->fetchAll() as $item) {
+                $prefix = $definition['titlePrefix'] ?? $definition['type'];
                 $events[] = [
-                    'title' => $definition['type'] . ': ' . $item[$definition['title']],
+                    'title' => $prefix . ': ' . $item[$definition['title']],
                     'start' => $item['start_datetime'],
                     'end' => $item['end_datetime'] ?: $item['start_datetime'],
                     'className' => 'cmmp-fc-event-booked',

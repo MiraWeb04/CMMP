@@ -11,10 +11,13 @@
 
         const applyDayStyles = () => {
             element.querySelectorAll('.fc-daygrid-day').forEach((cell) => {
-                cell.classList.remove('cmmp-calendar-day-available', 'cmmp-calendar-day-booked');
+                cell.classList.remove('cmmp-calendar-day-available', 'cmmp-calendar-day-booked', 'cmmp-calendar-day-today-mark');
                 const dateStr = cell.dataset.date;
                 if (!dateStr) {
                     return;
+                }
+                if (cell.classList.contains('fc-day-today')) {
+                    cell.classList.add('cmmp-calendar-day-today-mark');
                 }
                 if (bookedDates.has(dateStr)) {
                     cell.classList.add('cmmp-calendar-day-booked');
@@ -29,8 +32,11 @@
             initialDate: options.initialDate || undefined,
             height: 'auto',
             fixedWeekCount: false,
-            dayMaxEvents: 1,
+            dayMaxEvents: 3,
+            moreLinkText: (num) => `+${num} more`,
             firstDay: 0,
+            displayEventTime: true,
+            eventTimeFormat: {hour: 'numeric', minute: '2-digit', meridiem: 'short'},
             headerToolbar: options.headerToolbar || {left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth'},
             events: (info, success, failure) => {
                 const query = new URLSearchParams({start: info.startStr, end: info.endStr});
@@ -58,7 +64,22 @@
                         failure(error);
                     });
             },
+            eventsSet: () => window.requestAnimationFrame(applyDayStyles),
             datesSet: () => window.requestAnimationFrame(applyDayStyles),
+            eventContent: (arg) => {
+                const pill = document.createElement('div');
+                pill.className = 'cmmp-cal-event-pill';
+                const dot = document.createElement('span');
+                dot.className = 'cmmp-cal-event-dot';
+                dot.setAttribute('aria-hidden', 'true');
+                pill.appendChild(dot);
+                const label = document.createElement('span');
+                label.className = 'cmmp-cal-event-label';
+                const timePrefix = arg.timeText ? `${arg.timeText} ` : '';
+                label.textContent = `${timePrefix}${arg.event.title}`;
+                pill.appendChild(label);
+                return {domNodes: [pill]};
+            },
             eventClick: (info) => {
                 info.jsEvent.preventDefault();
                 const details = info.event.extendedProps;

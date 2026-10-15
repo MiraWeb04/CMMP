@@ -33,14 +33,12 @@ require __DIR__ . '/../../includes/breadcrumb.php';
             <?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= $selectedFacilityId === (int) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name']) ?></option><?php endforeach; ?>
         </select>
     </div>
-    <div class="cmmp-calendar-legend" aria-label="Calendar legend">
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-available"></i>Available</span>
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-blocked"></i>Booked</span>
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-today"></i>Today</span>
-    </div>
 </div>
 <div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open. Red days already have confirmed church bookings. Pending requests are not shown on this calendar.</span></div>
-<div class="cmmp-calendar-shell"><div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div></div>
+<div class="cmmp-calendar-shell">
+    <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
+    <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>
+</div>
 <div id="calendar-message" class="alert alert-danger mt-3" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 <script src="<?= e(APP_BASE_URL) ?>/assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
