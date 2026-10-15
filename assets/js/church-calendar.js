@@ -8,18 +8,48 @@
         }
 
         let bookedDates = new Set();
+        let calendar = null;
+
+        const localDateStr = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const mergeEventBookedDates = () => {
+            const merged = new Set(bookedDates);
+            if (!calendar) {
+                return merged;
+            }
+            calendar.getEvents().forEach((event) => {
+                if (!event.start) {
+                    return;
+                }
+                const start = new Date(event.start.getTime());
+                start.setHours(0, 0, 0, 0);
+                const endSource = event.end || event.start;
+                const end = new Date(endSource.getTime());
+                end.setHours(0, 0, 0, 0);
+                for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+                    merged.add(localDateStr(cursor));
+                }
+            });
+            return merged;
+        };
 
         const applyDayStyles = () => {
+            const mergedBookedDates = mergeEventBookedDates();
             element.querySelectorAll('.fc-daygrid-day').forEach((cell) => {
                 cell.classList.remove('cmmp-calendar-day-available', 'cmmp-calendar-day-booked', 'cmmp-calendar-day-today-mark');
-                const dateStr = cell.dataset.date;
+                const dateStr = cell.getAttribute('data-date') || cell.dataset.date;
                 if (!dateStr) {
                     return;
                 }
                 if (cell.classList.contains('fc-day-today')) {
                     cell.classList.add('cmmp-calendar-day-today-mark');
                 }
-                if (bookedDates.has(dateStr)) {
+                if (mergedBookedDates.has(dateStr)) {
                     cell.classList.add('cmmp-calendar-day-booked');
                 } else {
                     cell.classList.add('cmmp-calendar-day-available');
@@ -27,7 +57,7 @@
             });
         };
 
-        const calendar = new FullCalendar.Calendar(element, {
+        calendar = new FullCalendar.Calendar(element, {
             initialView: window.innerWidth < 768 ? 'listMonth' : 'dayGridMonth',
             initialDate: options.initialDate || undefined,
             height: 'auto',
@@ -98,6 +128,7 @@
         }
 
         calendar.render();
+        window.requestAnimationFrame(applyDayStyles);
         return calendar;
     };
 })();

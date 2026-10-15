@@ -1327,14 +1327,14 @@ a.cmmp-dash-link:hover {
     min-height: 112px;
 }
 
-.cmmp-calendar-shell .fc .fc-daygrid-day.cmmp-calendar-day-booked .fc-daygrid-day-frame {
-    background: #fce8e6;
-    border-color: #f28b82;
-}
-
-.cmmp-calendar-shell .fc .fc-daygrid-day.cmmp-calendar-day-available .fc-daygrid-day-frame {
+.cmmp-calendar-shell .fc .fc-daygrid-day.cmmp-calendar-day-available:not(.cmmp-calendar-day-booked) .fc-daygrid-day-frame {
     background: #e6f4ea;
     border-color: #81c995;
+}
+
+.cmmp-calendar-shell .fc .fc-daygrid-day.cmmp-calendar-day-booked .fc-daygrid-day-frame {
+    background: #fce8e6 !important;
+    border-color: #f28b82 !important;
 }
 
 .cmmp-calendar-shell .fc .fc-daygrid-day.cmmp-calendar-day-booked .fc-daygrid-day-number {
