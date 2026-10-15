@@ -68,7 +68,7 @@ if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
 $durationHours = $code === 'FUNERAL_SERVICE' ? 2 : 1;
 if ($preferredDate !== '' && $preferredTime !== '') {
     $preferredStart = $preferredDate . 'T' . $preferredTime;
-    if ($code === 'FACILITY_RESERVATION' && $preferredEndTime !== '') {
+    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true) && $preferredEndTime !== '') {
         $preferredEnd = $preferredDate . 'T' . $preferredEndTime;
     } else {
         $startTimestamp = strtotime($preferredStart);
@@ -296,6 +296,24 @@ $field = static function (array $data, string $name): string {
                     </select>
                 </div>
                 <div class="col-md-12"><label class="form-label" for="funeral_location">Location details</label><input class="form-control" id="funeral_location" name="funeral_location" value="<?= $field($data, 'funeral_location') ?>"></div>
+            </div>
+        <?php elseif ($code === 'MANANITA'): ?>
+            <h2 class="h5 mt-2">Mañanita service</h2>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6"><label class="form-label" for="honoree_name">Birthday honoree</label><input class="form-control" id="honoree_name" name="honoree_name" value="<?= $field($data, 'honoree_name') ?>" required></div>
+                <div class="col-md-3"><label class="form-label" for="contact_number">Contact number</label><input class="form-control" id="contact_number" name="contact_number" value="<?= $field($data, 'contact_number') ?>" required></div>
+                <div class="col-md-3"><label class="form-label" for="contact_email">Email</label><input class="form-control" id="contact_email" name="contact_email" type="email" value="<?= $field($data, 'contact_email') ?>"></div>
+                <div class="col-md-6"><label class="form-label" for="preferred_facility_id">Facility</label>
+                    <select class="form-select" id="preferred_facility_id" name="preferred_facility_id" required>
+                        <option value="">Select a facility</option>
+                        <?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= $facilityId === (int) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name']) ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6"><label class="form-label" for="event_purpose">Occasion details</label><input class="form-control" id="event_purpose" name="event_purpose" value="<?= $field($data, 'event_purpose') ?>" placeholder="e.g. 70th birthday mañanita"></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_date">Preferred date</label><input class="form-control" id="preferred_date" name="preferred_date" type="date" value="<?= e($preferredDate) ?>" required></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_time">Start time</label><input class="form-control" id="preferred_time" name="preferred_time" type="time" value="<?= e($preferredTime) ?>" required></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_end_time">End time</label><input class="form-control" id="preferred_end_time" name="preferred_end_time" type="time" value="<?= e($preferredEndTime) ?>" required></div>
+                <div class="col-12"><label class="form-label" for="additional_information">Additional notes</label><textarea class="form-control" id="additional_information" name="additional_information" rows="3"><?= $field($data, 'additional_information') ?></textarea></div>
             </div>
         <?php elseif ($code === 'FACILITY_RESERVATION'): ?>
             <h2 class="h5 mt-2">Facility Reservation</h2>
