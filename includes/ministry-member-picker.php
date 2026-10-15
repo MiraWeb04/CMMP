@@ -18,7 +18,7 @@ $memberOption = static function (array $member, int $selectedId): string {
         <label class="form-label mb-0">Members</label>
         <button class="btn btn-sm btn-outline-primary" id="add-ministry-member" type="button" <?= $memberChoices === [] ? 'disabled' : '' ?>>Add member</button>
     </div>
-    <div class="form-text mb-2">Add every church member who belongs to this ministry. Use Add member for each additional person.</div>
+    <div class="form-text mb-2">Each church member can belong to only one ministry at a time (as member or leader). Use Add member for each additional person.</div>
     <div id="ministry-member-rows">
         <?php foreach ($memberRows as $row): ?>
             <div class="row g-2 align-items-center mb-2 ministry-member-row">
