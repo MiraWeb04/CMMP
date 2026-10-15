@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/AuditLog.php';
 
 final class Member
@@ -104,20 +105,20 @@ final class Member
         return $memberId === false ? null : self::find((int) $memberId);
     }
 
-    public static function createFromRegistration(int $userId, string $firstName, string $lastName, ?string $email = null): int
+    public static function createFromRegistration(int $userId, array $profile): int
     {
         $memberNumber = 'CMMP-' . strtoupper(bin2hex(random_bytes(5)));
         $member = [
             'user_id' => $userId,
             'member_number' => $memberNumber,
-            'first_name' => $firstName ?: 'Member',
+            'first_name' => trim((string) ($profile['first_name'] ?? '')) ?: 'Member',
             'middle_name' => null,
-            'last_name' => $lastName ?: 'User',
+            'last_name' => trim((string) ($profile['last_name'] ?? '')) ?: 'User',
             'suffix' => null,
-            'date_of_birth' => null,
-            'gender' => null,
+            'date_of_birth' => trim((string) ($profile['date_of_birth'] ?? '')) ?: null,
+            'gender' => trim((string) ($profile['gender'] ?? '')) ?: null,
             'phone' => null,
-            'email' => $email,
+            'email' => trim((string) ($profile['email'] ?? '')) ?: null,
             'address_line_1' => null,
             'address_line_2' => null,
             'city' => null,
@@ -156,7 +157,16 @@ final class Member
         );
         $query->execute($data);
 
-        return (int) database()->lastInsertId();
+        $memberId = (int) database()->lastInsertId();
+        if (($data['membership_status'] ?? 'ACTIVE') === 'ACTIVE') {
+            fellowship_sync_member(
+                $memberId,
+                $data['date_of_birth'] ?? null,
+                $data['gender'] ?? null
+            );
+        }
+
+        return $memberId;
     }
 
     public static function update(int $id, array $data): void
@@ -180,6 +190,12 @@ final class Member
         $data['id'] = $id;
         $query = database()->prepare('UPDATE members SET ' . implode(', ', $assignments) . ' WHERE id = :id');
         $query->execute($data);
+
+        $profile = self::find($id);
+        if ($profile) {
+            fellowship_sync_member($id, $profile['date_of_birth'] ?? null, $profile['gender'] ?? null);
+        }
+
         AuditLog::record(null, 'MEMBER_UPDATED', 'MEMBER', $id);
     }
 

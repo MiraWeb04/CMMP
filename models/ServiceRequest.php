@@ -74,7 +74,8 @@ final class ServiceRequest
                 filter_var($data['preferred_facility_id'] ?? null, FILTER_VALIDATE_INT) ?: null,
                 null,
                 null,
-                $serviceCode
+                $serviceCode,
+                false
             );
             if (trim((string) ($data['request_number'] ?? '')) === '') {
                 $data['request_number'] = self::nextRequestNumber($connection);
@@ -207,6 +208,46 @@ final class ServiceRequest
         );
         $query->execute($parameters);
         return $query->fetchAll();
+    }
+
+    public static function paginateForAssignedStaff(int $staffId, string $search = '', string $status = ''): array
+    {
+        $conditions = ['sa.staff_id = :staff_id'];
+        $parameters = ['staff_id' => $staffId];
+        if ($search !== '') {
+            $conditions[] = '(sr.request_number LIKE :search OR sr.subject LIKE :search OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search)';
+            $parameters['search'] = '%' . $search . '%';
+        }
+        if ($status !== '') {
+            $conditions[] = 'sr.status = :status';
+            $parameters['status'] = $status;
+        }
+        $where = 'WHERE ' . implode(' AND ', $conditions);
+        $query = database()->prepare(
+            "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
+                    COALESCE(st.name, 'Unknown Service') AS service_name,
+                    COALESCE(CONCAT(m.first_name, ' ', m.last_name), 'Unknown Member') AS member_name,
+                    sa.assignment_role
+             FROM service_assignments sa
+             INNER JOIN service_requests sr ON sr.id = sa.service_request_id
+             LEFT JOIN service_types st ON st.id = sr.service_type_id
+             LEFT JOIN members m ON m.id = sr.requested_by_member_id
+             $where
+             ORDER BY sr.created_at DESC"
+        );
+        $query->execute($parameters);
+
+        return $query->fetchAll();
+    }
+
+    public static function isAssignedToStaff(int $requestId, int $staffId): bool
+    {
+        $query = database()->prepare(
+            'SELECT 1 FROM service_assignments WHERE service_request_id = :request_id AND staff_id = :staff_id LIMIT 1'
+        );
+        $query->execute(['request_id' => $requestId, 'staff_id' => $staffId]);
+
+        return (bool) $query->fetchColumn();
     }
 
     public static function find(int $id): ?array
@@ -411,9 +452,8 @@ final class ServiceRequest
         );
         $assignment->execute(['request_id' => $requestId, 'staff_id' => $staffId]);
         $assignedToPastor = (bool) $assignment->fetchColumn();
-        $openForReview = in_array($status, ['PENDING', 'PENDING_ASSIGNMENT', 'UNDER_REVIEW', 'DOCUMENTS_REQUIRED', 'RESCHEDULE_REQUIRED'], true);
-        if (!$assignedToPastor && !$openForReview) {
-            throw new InvalidArgumentException('This request is not waiting for your decision.');
+        if (!$assignedToPastor) {
+            throw new InvalidArgumentException('This request is not assigned to you.');
         }
 
         if ($decision === 'approve') {

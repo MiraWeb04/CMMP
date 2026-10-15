@@ -116,8 +116,8 @@ $spotlight = $announcements[0] ?? null;
     <header class="church-hero">
         <nav class="church-nav">
             <a class="church-brand" href="<?= e(APP_BASE_URL) ?>/member-portal.php">
-                <span class="church-brand-mark"><i class="fa-solid fa-church"></i></span>
-                <span><strong>CMMP</strong><small>Church portal</small></span>
+                <img class="church-brand-mark cmmp-brand-logo" src="<?= e(APP_BASE_URL) ?>/assets/images/uccp-logo.png" alt="UCCP logo" width="44" height="44" decoding="async">
+                <span><strong>CMMP</strong><small>UCCP Church portal</small></span>
             </a>
             <ul class="church-menu">
                 <li><a class="is-current" href="<?= e(APP_BASE_URL) ?>/member-portal.php">Home</a></li>

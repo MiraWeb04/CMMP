@@ -119,17 +119,18 @@ final class AvailabilityService
             foreach ($people as $person) {
                 $appointmentConflicts = self::overlappingAppointments((int) $person['id'], $window['start'], $window['end'], null);
                 $assignmentConflicts = self::overlappingAssignments((int) $person['id'], $window['start'], $window['end'], $excludeRequestId);
-                if ($appointmentConflicts === [] && $assignmentConflicts === []) {
+                $eventConflicts = self::overlappingEventAssignments((int) $person['id'], $window['start'], $window['end']);
+                if ($appointmentConflicts === [] && $assignmentConflicts === [] && $eventConflicts === []) {
                     $available[] = $person;
                     continue;
                 }
                 $reason = 'Already assigned to another service';
-                if ($appointmentConflicts !== []) {
+                if ($eventConflicts !== []) {
+                    $reason = 'Already assigned to a church event';
+                } elseif ($appointmentConflicts !== []) {
                     $conflict = $appointmentConflicts[0];
                     $reason = 'Already assigned to another service';
-                    if (!empty($conflict['service_request_title'])) {
-                        $reason = 'Already assigned to another service';
-                    } elseif (!empty($conflict['event_title'])) {
+                    if (!empty($conflict['event_title'])) {
                         $reason = 'Already assigned to a church event';
                     } elseif (!empty($conflict['appointment_type'])) {
                         $reason = 'Already assigned to another appointment';
@@ -157,6 +158,27 @@ final class AvailabilityService
              ORDER BY display_name'
         );
         $query->execute(['personnel_type' => $type]);
+        return $query->fetchAll();
+    }
+
+    private static function overlappingEventAssignments(int $personnelId, string $start, string $end): array
+    {
+        $query = database()->prepare(
+            'SELECT e.id, e.title, e.start_datetime, e.end_datetime
+             FROM event_assignments ea
+             INNER JOIN events e ON e.id = ea.event_id
+             WHERE ea.staff_id = :staff_id
+               AND e.event_status = "PUBLISHED"
+               AND e.start_datetime < :end_datetime
+               AND e.end_datetime > :start_datetime
+             ORDER BY e.start_datetime'
+        );
+        $query->execute([
+            'staff_id' => $personnelId,
+            'start_datetime' => $start,
+            'end_datetime' => $end,
+        ]);
+
         return $query->fetchAll();
     }
 

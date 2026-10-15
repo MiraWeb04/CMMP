@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/../models/ChurchCalendar.php';
+require_once __DIR__ . '/../models/Facility.php';
 require_once __DIR__ . '/../models/ServiceRequest.php';
 
 const SERVICE_REQUEST_STATUSES = [
@@ -18,8 +20,10 @@ const SERVICE_REQUEST_STATUSES = [
     'REJECTED',
     'CANCELLED',
 ];
-const SERVICE_REVIEW_ROLES = ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR'];
+const SERVICE_REVIEW_ROLES = ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF'];
+const SERVICE_CALENDAR_ROLES = ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR'];
 const SERVICE_ASSIGN_ROLES = ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF'];
+const SERVICE_PASTOR_DECISION_ROLES = ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR'];
 
 function service_status_label(string $status): string
 {
@@ -86,7 +90,7 @@ function service_request_input(array $source): array
         'family_contact_name', 'family_contact_relationship', 'funeral_location',
         'funeral_location_type',
         'house_family_name', 'house_address', 'house_barangay', 'house_city', 'house_landmark', 'residence_type',
-        'event_purpose', 'event_type', 'expected_attendees', 'setup_requirements',
+        'event_purpose', 'event_type', 'expected_attendees', 'setup_requirements', 'honoree_name',
         'partner_1_name', 'partner_2_name', 'first_counseling_session', 'expected_wedding_date', 'previous_sessions',
         'counseling_topics', 'counseling_type', 'counseling_reason',
     ];
@@ -158,8 +162,10 @@ function validate_service_request(string $code, array $data, string $preferredSt
         $errors[] = 'The preferred schedule must be today or a future date.';
     }
 
-    if ($code === 'FACILITY_RESERVATION' && ($facilityId === null || $facilityId < 1)) {
-        $errors[] = 'Select the church facility you want to reserve.';
+    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true) && ($facilityId === null || $facilityId < 1)) {
+        $errors[] = $code === 'MANANITA'
+            ? 'Select the church facility for the mañanita service.'
+            : 'Select the church facility you want to reserve.';
     }
 
     if ($code === 'HOUSE_BLESSING') {
@@ -181,6 +187,7 @@ function validate_service_request(string $code, array $data, string $preferredSt
         'FUNERAL_SERVICE' => ['deceased_name' => 'Deceased person', 'date_of_death' => 'Date of death', 'family_contact_name' => 'Contact person'],
         'BAPTISM' => ['candidate_name' => 'Full name of the child or candidate', 'contact_number' => 'Contact number'],
         'FACILITY_RESERVATION' => ['event_purpose' => 'Event name'],
+        'MANANITA' => ['honoree_name' => 'Birthday honoree', 'contact_number' => 'Contact number'],
         'HOUSE_BLESSING' => ['applicant_name' => 'Full name', 'house_address' => 'Address', 'house_landmark' => 'Landmark', 'contact_number' => 'Contact number'],
         'PRE_MARRIAGE_COUNSELING' => ['partner_1_name' => 'Partner 1 full name', 'partner_2_name' => 'Partner 2 full name', 'contact_number' => 'Contact number'],
         'PASTORAL_COUNSELING' => ['applicant_name' => 'Full name', 'counseling_type' => 'Counseling type'],
@@ -191,7 +198,42 @@ function validate_service_request(string $code, array $data, string $preferredSt
             $errors[] = $label . ' is required.';
         }
     }
+
+    if ($errors === [] && $preferredStart !== '' && $preferredEnd !== '') {
+        $calendarFacilityId = $facilityId;
+        if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
+            $calendarFacilityId = (int) Facility::counselingOffice()['id'];
+        }
+
+        try {
+            ChurchCalendar::assertAvailable(
+                date('Y-m-d H:i:s', strtotime($preferredStart)),
+                date('Y-m-d H:i:s', strtotime($preferredEnd)),
+                $calendarFacilityId,
+                null,
+                null,
+                $code,
+                false
+            );
+        } catch (CalendarConflictException $exception) {
+            $errors[] = $exception->getMessage();
+        }
+    }
+
     return $errors;
+}
+
+function service_facility_for_applicability(string $code, ?int $facilityId): ?int
+{
+    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true)) {
+        return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
+    }
+
+    if (in_array($code, ['WEDDING', 'BAPTISM', 'FUNERAL_SERVICE'], true)) {
+        return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
+    }
+
+    return null;
 }
 
 function upload_service_documents(?array $files, int $userId): array

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../models/Ministry.php';
 $connection = database();
 $suffix = strtoupper(bin2hex(random_bytes(4)));
 $ministryId = null;
+$otherMinistryId = null;
 $memberId = null;
 $leaderMemberId = null;
 $staffId = null;
@@ -34,6 +35,23 @@ try {
         throw new RuntimeException('Admin assignment failed.');
     }
     try {
+        Ministry::addMember($ministryId, $memberId, 'Leader');
+        throw new RuntimeException('Duplicate ministry role assignment must be blocked.');
+    } catch (InvalidArgumentException $exception) {
+        if (!str_contains($exception->getMessage(), 'already assigned')) {
+            throw $exception;
+        }
+    }
+    $otherMinistryId = Ministry::create(['name' => 'Other Ministry ' . $suffix, 'code' => 'OTHER-' . $suffix, 'description' => 'Test', 'leader_staff_id' => null]);
+    try {
+        Ministry::addMember($otherMinistryId, $memberId, 'Member');
+        throw new RuntimeException('Cross-ministry assignment must be blocked.');
+    } catch (InvalidArgumentException $exception) {
+        if (!str_contains($exception->getMessage(), 'already assigned')) {
+            throw $exception;
+        }
+    }
+    try {
         Ministry::requestJoin($ministryId, $memberId);
         throw new RuntimeException('Member join requests must be disabled.');
     } catch (RuntimeException $exception) {
@@ -43,6 +61,9 @@ try {
     }
     echo "Ministry management smoke test passed.\n";
 } finally {
+    if (isset($otherMinistryId) && $otherMinistryId) {
+        $connection->prepare('DELETE FROM ministries WHERE id=:id')->execute(['id' => $otherMinistryId]);
+    }
     if ($ministryId) {
         $connection->prepare('DELETE FROM ministries WHERE id=:id')->execute(['id' => $ministryId]);
     }

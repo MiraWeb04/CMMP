@@ -679,7 +679,8 @@ VALUES
 	('PRE_MARRIAGE_COUNSELING', 'Pre-Marriage Counseling', 'Pre-marriage counseling request'),
 	('CHILD_DEDICATION', 'Child Dedication', 'Child dedication request'),
 	('HOUSE_BLESSING', 'House Blessing', 'House blessing request'),
-	('PASTORAL_COUNSELING', 'Pastoral Counseling', 'Pastoral counseling request')
+	('PASTORAL_COUNSELING', 'Pastoral Counseling', 'Pastoral counseling request'),
+	('MANANITA', 'Mañanita', 'Birthday surprise worship service (mañanita) request')
 ON DUPLICATE KEY UPDATE
 	name = VALUES(name),
 	description = VALUES(description),
