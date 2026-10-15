@@ -182,6 +182,109 @@ final class ChurchCalendar
         return array_keys($blocked);
     }
 
+    /**
+     * Whether this service type can still be requested on the given date (church events/activities only).
+     */
+    public static function serviceApplicableOnDate(string $serviceCode, string $date, ?int $facilityId = null): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            return true;
+        }
+
+        if ($serviceCode === 'HOUSE_BLESSING') {
+            return true;
+        }
+
+        return self::serviceHasEventRoomOnDate($serviceCode, $date, $facilityId);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function serviceProbeWindow(string $serviceCode, string $date): array
+    {
+        return match ($serviceCode) {
+            'FUNERAL_SERVICE' => [$date . ' 18:00:00', $date . ' 20:00:00'],
+            'PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING' => [$date . ' 09:00:00', $date . ' 10:00:00'],
+            'FACILITY_RESERVATION', 'MANANITA' => [$date . ' 08:00:00', $date . ' 17:00:00'],
+            default => [$date . ' 09:00:00', $date . ' 11:00:00'],
+        };
+    }
+
+    /**
+     * @param list<array<string, mixed>> $conflicts
+     * @return list<array<string, mixed>>
+     */
+    private static function eventScheduleConflicts(array $conflicts): array
+    {
+        return array_values(array_filter(
+            $conflicts,
+            static fn(array $item): bool => in_array((string) ($item['type'] ?? ''), ['Church event', 'Church activity'], true)
+        ));
+    }
+
+    private static function serviceHasEventRoomOnDate(string $serviceCode, string $date, ?int $facilityId): bool
+    {
+        [$start, $end] = self::serviceProbeWindow($serviceCode, $date);
+
+        if (in_array($serviceCode, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
+            require_once __DIR__ . '/Facility.php';
+            $counselingFacilityId = (int) Facility::counselingOffice()['id'];
+
+            return self::eventScheduleConflicts(
+                self::conflicts($start, $end, $counselingFacilityId, null, null, $serviceCode)
+            ) === [];
+        }
+
+        if (in_array($serviceCode, ['FACILITY_RESERVATION', 'MANANITA'], true)) {
+            if ($facilityId !== null && $facilityId > 0) {
+                return self::eventScheduleConflicts(
+                    self::conflicts($start, $end, $facilityId, null, null, $serviceCode)
+                ) === [];
+            }
+
+            return self::anyFacilityHasEventRoom($start, $end, $serviceCode);
+        }
+
+        if (in_array($serviceCode, ['WEDDING', 'BAPTISM', 'FUNERAL_SERVICE'], true)) {
+            if ($facilityId !== null && $facilityId > 0) {
+                return self::eventScheduleConflicts(
+                    self::conflicts($start, $end, $facilityId, null, null, $serviceCode)
+                ) === [];
+            }
+
+            return self::anyFacilityHasEventRoom($start, $end, $serviceCode);
+        }
+
+        return self::eventScheduleConflicts(
+            self::conflicts($start, $end, $facilityId, null, null, $serviceCode)
+        ) === [];
+    }
+
+    private static function anyFacilityHasEventRoom(string $start, string $end, string $serviceCode): bool
+    {
+        $facilities = database()->query(
+            "SELECT id FROM facilities WHERE facility_status = 'AVAILABLE' ORDER BY id"
+        )->fetchAll();
+
+        if ($facilities === []) {
+            return self::eventScheduleConflicts(
+                self::conflicts($start, $end, null, null, null, $serviceCode)
+            ) === [];
+        }
+
+        foreach ($facilities as $facility) {
+            $facilityId = (int) $facility['id'];
+            if (self::eventScheduleConflicts(
+                self::conflicts($start, $end, $facilityId, null, null, $serviceCode)
+            ) === []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function assertAvailable(
         string $startDateTime,
         string $endDateTime,

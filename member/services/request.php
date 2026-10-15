@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/Member.php';
 require_once __DIR__ . '/../../models/Facility.php';
+require_once __DIR__ . '/../../models/ChurchCalendar.php';
 
 require_role('MEMBER');
 
@@ -59,6 +60,20 @@ foreach ($types as $type) {
 }
 
 $code = $selected['code'] ?? '';
+$serviceApplicability = [];
+if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1) {
+    foreach ($types as $type) {
+        $typeCode = (string) $type['code'];
+        $serviceApplicability[$typeCode] = ChurchCalendar::serviceApplicableOnDate(
+            $typeCode,
+            $preferredDate,
+            service_facility_for_applicability($typeCode, $facilityId)
+        );
+    }
+}
+$selectedNotApplicable = $code !== ''
+    && $preferredDate !== ''
+    && ($serviceApplicability[$code] ?? true) === false;
 $counselingOffice = null;
 if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
     $counselingOffice = Facility::counselingOffice();
@@ -85,6 +100,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_valid_csrf_token();
     if (!$selected) {
         $errors[] = 'Select a valid service type.';
+    } elseif (
+        $preferredDate !== ''
+        && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1
+        && !ChurchCalendar::serviceApplicableOnDate(
+            (string) $selected['code'],
+            $preferredDate,
+            service_facility_for_applicability((string) $selected['code'], $facilityId)
+        )
+    ) {
+        $errors[] = (string) $selected['name'] . ' is not available on the selected date because of a church event or activity on the schedule.';
     } else {
         $errors = validate_service_request($selected['code'], $data, $preferredStart, $preferredEnd, $facilityId);
     }
@@ -161,11 +186,19 @@ $field = static function (array $data, string $name): string {
             <select class="form-select" id="service_type_id" name="service_type_id" required onchange="this.form.submit()">
                 <option value="">Select service</option>
                 <?php foreach ($types as $type): ?>
-                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
+                    <?php
+                    $typeCode = (string) $type['code'];
+                    $applicable = $serviceApplicability === [] || ($serviceApplicability[$typeCode] ?? true);
+                    $optionLabel = (string) $type['name'];
+                    if (!$applicable) {
+                        $optionLabel .= ' (Unavailable on this date)';
+                    }
+                    ?>
+                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?> <?= $applicable ? '' : 'disabled' ?>><?= e($optionLabel) ?></option>
                 <?php endforeach; ?>
             </select>
             <?php if ($preferredDate !== ''): ?>
-                <div class="form-text">Selected date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. Choose a time and venue; only overlapping schedules will be rejected.</div>
+                <div class="form-text">Date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. Services marked unavailable conflict with a church event or activity for that service type only. Other services may still be requested.</div>
             <?php endif; ?>
         </div>
         <?php if ($preferredDate !== ''): ?>
@@ -177,7 +210,13 @@ $field = static function (array $data, string $name): string {
     </form>
 </div>
 
-<?php if ($selected): ?>
+<?php if ($selected && $selectedNotApplicable): ?>
+<div class="alert alert-warning">
+    <?= e($selected['name']) ?> is not available on <?= e(date('F j, Y', strtotime($preferredDate))) ?> due to a scheduling conflict with a church event or activity. Choose another date or select a different service that is still available.
+</div>
+<?php endif; ?>
+
+<?php if ($selected && !$selectedNotApplicable): ?>
 <div class="cmmp-card">
     <p class="text-muted"><?= e($selected['description'] ?? 'Complete the service information and your preferred schedule.') ?></p>
 

@@ -222,6 +222,19 @@ function validate_service_request(string $code, array $data, string $preferredSt
     return $errors;
 }
 
+function service_facility_for_applicability(string $code, ?int $facilityId): ?int
+{
+    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true)) {
+        return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
+    }
+
+    if (in_array($code, ['WEDDING', 'BAPTISM', 'FUNERAL_SERVICE'], true)) {
+        return $facilityId !== null && $facilityId > 0 ? $facilityId : null;
+    }
+
+    return null;
+}
+
 function upload_service_documents(?array $files, int $userId): array
 {
     if (!$files || !isset($files['name']) || !is_array($files['name'])) {
