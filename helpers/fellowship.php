@@ -142,16 +142,11 @@ function fellowship_backfill_all_active_members(): int
     $updated = 0;
     foreach ($members as $member) {
         $memberId = (int) $member['id'];
-        if (!fellowship_profile_needs_generation($member['date_of_birth'] ?? null, $member['gender'] ?? null)) {
-            fellowship_sync_member($memberId, $member['date_of_birth'] ?? null, $member['gender'] ?? null);
+        if (fellowship_profile_needs_generation($member['date_of_birth'] ?? null, $member['gender'] ?? null)) {
             continue;
         }
-
-        $profile = fellowship_ensure_member_profile($memberId);
-        if ($profile['generated']) {
-            $updated++;
-        }
-        fellowship_sync_member($memberId, $profile['date_of_birth'], $profile['gender']);
+        fellowship_sync_member($memberId, $member['date_of_birth'] ?? null, $member['gender'] ?? null);
+        $updated++;
     }
 
     return $updated;
@@ -159,7 +154,11 @@ function fellowship_backfill_all_active_members(): int
 
 function fellowship_validate_member_profile(array $data, bool $admin): array
 {
-    return [];
+    if (!$admin) {
+        return [];
+    }
+
+    return validate_member_registration_profile($data);
 }
 
 function fellowship_ministry_id_for_code(string $code): ?int
