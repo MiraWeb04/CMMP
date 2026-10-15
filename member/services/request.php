@@ -60,6 +60,9 @@ foreach ($types as $type) {
 }
 
 $code = $selected['code'] ?? '';
+$probeTime = $preferredTime !== '' && preg_match('/^\d{2}:\d{2}/', $preferredTime) === 1
+    ? substr($preferredTime, 0, 5)
+    : null;
 $serviceApplicability = [];
 if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1) {
     foreach ($types as $type) {
@@ -67,7 +70,8 @@ if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate)
         $serviceApplicability[$typeCode] = ChurchCalendar::serviceApplicableOnDate(
             $typeCode,
             $preferredDate,
-            service_facility_for_applicability($typeCode, $facilityId)
+            service_facility_for_applicability($typeCode, $facilityId),
+            $probeTime
         );
     }
 }
@@ -106,7 +110,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         && !ChurchCalendar::serviceApplicableOnDate(
             (string) $selected['code'],
             $preferredDate,
-            service_facility_for_applicability((string) $selected['code'], $facilityId)
+            service_facility_for_applicability((string) $selected['code'], $facilityId),
+            $probeTime
         )
     ) {
         $errors[] = (string) $selected['name'] . ' is not available on the selected date because of a church event or activity on the schedule.';

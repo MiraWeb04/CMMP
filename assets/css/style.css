@@ -1283,6 +1283,11 @@ a.cmmp-dash-link:hover {
     border: 1px solid #f28b82;
 }
 
+.cmmp-calendar-swatch-pending {
+    background: #fff4e5;
+    border: 1px solid #f0b429;
+}
+
 .cmmp-calendar-legend-footer {
     align-items: center;
     background: #eef6ff;

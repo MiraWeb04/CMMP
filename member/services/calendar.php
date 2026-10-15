@@ -44,7 +44,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         </select>
     </div>
 </div>
-<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days have no confirmed booking conflict for this service. Red days are already booked. Church events appear on the calendar but do not block the whole day—you can still request a different time unless it overlaps.</span></div>
+<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green = open for this service. Red = confirmed booking. Orange entries = pending requests (informational). Published church events are shown; pick a time that does not overlap.</span></div>
 <div class="cmmp-calendar-shell">
     <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-request-url="request.php" data-service-type-id="<?= $serviceTypeId ? (int) $serviceTypeId : '' ?>" data-service-code="<?= e($serviceCode) ?>" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
     <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>

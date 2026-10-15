@@ -212,7 +212,8 @@ function validate_service_request(string $code, array $data, string $preferredSt
                 $calendarFacilityId,
                 null,
                 null,
-                $code
+                $code,
+                false
             );
         } catch (CalendarConflictException $exception) {
             $errors[] = $exception->getMessage();

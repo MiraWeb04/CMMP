@@ -74,7 +74,8 @@ final class ServiceRequest
                 filter_var($data['preferred_facility_id'] ?? null, FILTER_VALIDATE_INT) ?: null,
                 null,
                 null,
-                $serviceCode
+                $serviceCode,
+                false
             );
             if (trim((string) ($data['request_number'] ?? '')) === '') {
                 $data['request_number'] = self::nextRequestNumber($connection);

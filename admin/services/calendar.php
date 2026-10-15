@@ -34,7 +34,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         </select>
     </div>
 </div>
-<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open. Red days already have confirmed church bookings. Pending requests are not shown on this calendar.</span></div>
+<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open. Red days already have confirmed church bookings. See <code>docs/scheduling-rules.md</code> in the repository for conflict rules.</span></div>
 <div class="cmmp-calendar-shell">
     <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
     <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>

@@ -35,9 +35,10 @@ if ($start === '' || $end === '') {
 
 try {
     $serviceCodeParam = $serviceCode !== '' ? $serviceCode : null;
+    $includePending = has_role('MEMBER');
     json_response([
         'success' => true,
-        'events' => ChurchCalendar::events($start, $end, $facilityId),
+        'events' => ChurchCalendar::events($start, $end, $facilityId, $includePending),
         'bookedDates' => ChurchCalendar::bookedDates($start, $end, $facilityId, $serviceCodeParam),
         'serviceCode' => $serviceCodeParam,
     ]);
