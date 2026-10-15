@@ -113,7 +113,7 @@ function fellowship_profile_needs_generation(?string $dateOfBirth, ?string $gend
 function fellowship_ensure_member_profile(int $memberId): array
 {
     $query = database()->prepare(
-        'SELECT date_of_birth, gender, membership_status FROM members WHERE id = :id LIMIT 1'
+        'SELECT date_of_birth, gender FROM members WHERE id = :id LIMIT 1'
     );
     $query->execute(['id' => $memberId]);
     $member = $query->fetch();
@@ -121,36 +121,10 @@ function fellowship_ensure_member_profile(int $memberId): array
         throw new RuntimeException('Member not found.');
     }
 
-    $dateOfBirth = $member['date_of_birth'] ?? null;
-    $gender = $member['gender'] ?? null;
-    $generated = false;
-
-    if ((string) ($member['membership_status'] ?? '') === 'ACTIVE'
-        && fellowship_profile_needs_generation($dateOfBirth, $gender)) {
-        $defaults = fellowship_generated_profile($memberId);
-        if ($dateOfBirth === null || trim((string) $dateOfBirth) === '' || fellowship_member_age((string) $dateOfBirth) === null) {
-            $dateOfBirth = $defaults['date_of_birth'];
-            $generated = true;
-        }
-        if ($gender === null || trim((string) $gender) === ''
-            || fellowship_code_for_profile((string) $dateOfBirth, (string) $gender) === null) {
-            $gender = $defaults['gender'];
-            $generated = true;
-        }
-
-        database()->prepare(
-            'UPDATE members SET date_of_birth = :date_of_birth, gender = :gender WHERE id = :id'
-        )->execute([
-            'id' => $memberId,
-            'date_of_birth' => $dateOfBirth,
-            'gender' => $gender,
-        ]);
-    }
-
     return [
-        'date_of_birth' => $dateOfBirth !== null ? (string) $dateOfBirth : null,
-        'gender' => $gender !== null ? (string) $gender : null,
-        'generated' => $generated,
+        'date_of_birth' => $member['date_of_birth'] !== null ? (string) $member['date_of_birth'] : null,
+        'gender' => $member['gender'] !== null ? (string) $member['gender'] : null,
+        'generated' => false,
     ];
 }
 

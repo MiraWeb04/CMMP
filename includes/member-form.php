@@ -77,7 +77,7 @@ $memberValue = static function (string $field) use ($member): string {
         <div class="col-md-8">
             <label class="form-label" for="fellowship_organization_preview">Fellowship organization</label>
             <input class="form-control" id="fellowship_organization_preview" value="<?= e($suggestedFellowshipLabel) ?>" readonly>
-            <div class="form-text">Members aged 12 and above are assigned automatically. If date of birth or gender is missing, the system generates values so a fellowship organization can be assigned. Organizations cannot be transferred manually.</div>
+            <div class="form-text">Members aged 12 and above are assigned to CYF, CYAF, UCM, or CWA from date of birth and gender. Organizations cannot be transferred manually.</div>
         </div>
         <div class="col-md-4">
             <label class="form-label" for="phone">Contact number</label>

@@ -3,14 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/member.php';
-require_once __DIR__ . '/../../helpers/fellowship.php';
-
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
-
-if (!isset($_SESSION['cmmp_fellowship_backfill_v1'])) {
-    fellowship_backfill_all_active_members();
-    $_SESSION['cmmp_fellowship_backfill_v1'] = true;
-}
 
 $filters = [
     'search' => trim((string) ($_GET['search'] ?? '')),

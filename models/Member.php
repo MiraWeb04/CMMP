@@ -105,20 +105,20 @@ final class Member
         return $memberId === false ? null : self::find((int) $memberId);
     }
 
-    public static function createFromRegistration(int $userId, string $firstName, string $lastName, ?string $email = null): int
+    public static function createFromRegistration(int $userId, array $profile): int
     {
         $memberNumber = 'CMMP-' . strtoupper(bin2hex(random_bytes(5)));
         $member = [
             'user_id' => $userId,
             'member_number' => $memberNumber,
-            'first_name' => $firstName ?: 'Member',
+            'first_name' => trim((string) ($profile['first_name'] ?? '')) ?: 'Member',
             'middle_name' => null,
-            'last_name' => $lastName ?: 'User',
+            'last_name' => trim((string) ($profile['last_name'] ?? '')) ?: 'User',
             'suffix' => null,
-            'date_of_birth' => null,
-            'gender' => null,
+            'date_of_birth' => trim((string) ($profile['date_of_birth'] ?? '')) ?: null,
+            'gender' => trim((string) ($profile['gender'] ?? '')) ?: null,
             'phone' => null,
-            'email' => $email,
+            'email' => trim((string) ($profile['email'] ?? '')) ?: null,
             'address_line_1' => null,
             'address_line_2' => null,
             'city' => null,
