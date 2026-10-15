@@ -158,11 +158,13 @@ final class Member
         $query->execute($data);
 
         $memberId = (int) database()->lastInsertId();
-        fellowship_sync_member(
-            $memberId,
-            $data['date_of_birth'] ?? null,
-            $data['gender'] ?? null
-        );
+        if (($data['membership_status'] ?? 'ACTIVE') === 'ACTIVE') {
+            fellowship_sync_member(
+                $memberId,
+                $data['date_of_birth'] ?? null,
+                $data['gender'] ?? null
+            );
+        }
 
         return $memberId;
     }
