@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/env.php';
+
+cmmp_load_environment();
+
 const APP_NAME = 'CMMP';
 const APP_TITLE = 'Church Management & Member Portal';
 const APP_ENV = 'development';

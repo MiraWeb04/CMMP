@@ -1,0 +1,13 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+auth.json
+credentials.json
+secrets.json
+*.pem
+id_rsa
+id_rsa.pub
+
+# Installed PHP dependencies
+/vendor/
