@@ -21,6 +21,7 @@ function e(?string $value): string
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="<?= e($pageDescription ?: APP_TITLE) ?>">
 	<title><?= e($pageTitle) ?> | <?= e(APP_NAME) ?></title>
+	<link rel="icon" type="image/png" href="<?= e(APP_BASE_URL) ?>/assets/images/uccp-logo.png">
 	<link rel="preconnect" href="https://cdn.jsdelivr.net">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

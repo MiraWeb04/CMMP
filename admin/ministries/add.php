@@ -9,7 +9,7 @@ require_once __DIR__ . '/../../models/Ministry.php';
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
 
 $people = Ministry::activePersonnel();
-$members = Ministry::activeMembersWithMinistries();
+$members = Ministry::membersEligibleForAssignment();
 $error = null;
 $form = [
     'name' => '',
