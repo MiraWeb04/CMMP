@@ -62,8 +62,20 @@ function notification_inbox_prepare(int $userId): array
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_valid_csrf_token();
         $action = (string) ($_POST['action'] ?? 'read');
+        $notice = '';
+        $noticeError = '';
         if ($action === 'read_all') {
             Notification::markAllRead($userId);
+        } elseif ($action === 'delete') {
+            try {
+                Notification::deleteReadForUser((int) ($_POST['id'] ?? 0), $userId);
+                $notice = 'deleted';
+            } catch (InvalidArgumentException $exception) {
+                $noticeError = $exception->getMessage();
+            } catch (Throwable $exception) {
+                error_log('CMMP notification delete failed: ' . $exception->getMessage());
+                $noticeError = 'The notification could not be deleted.';
+            }
         } else {
             Notification::markRead((int) ($_POST['id'] ?? 0), $userId);
         }
@@ -74,7 +86,13 @@ function notification_inbox_prepare(int $userId): array
             'period' => (string) ($_POST['period'] ?? 'all'),
         ];
         $query = notification_filter_query($filters + ['since' => '']);
-        header('Location: ' . basename((string) $_SERVER['SCRIPT_NAME']) . ($query === '' ? '' : '?' . $query));
+        $location = basename((string) $_SERVER['SCRIPT_NAME']) . ($query === '' ? '' : '?' . $query);
+        if ($notice !== '') {
+            $location .= ($query === '' ? '?' : '&') . $notice . '=1';
+        } elseif ($noticeError !== '') {
+            $location .= ($query === '' ? '?' : '&') . 'delete_error=' . urlencode($noticeError);
+        }
+        header('Location: ' . $location);
         exit;
     }
 

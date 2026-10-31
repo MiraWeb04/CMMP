@@ -52,6 +52,37 @@ final class Notification
 
     public static function markRead(int $id,int $userId): void { database()->prepare('UPDATE notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=:id AND user_id=:user_id')->execute(['id'=>$id,'user_id'=>$userId]); }
 
+    public static function findForUser(int $id, int $userId): ?array
+    {
+        $query = database()->prepare(
+            'SELECT * FROM notifications WHERE id = :id AND user_id = :user_id LIMIT 1'
+        );
+        $query->execute(['id' => $id, 'user_id' => $userId]);
+        $notification = $query->fetch();
+
+        return $notification ?: null;
+    }
+
+    public static function deleteReadForUser(int $id, int $userId): void
+    {
+        $notification = self::findForUser($id, $userId);
+        if (!$notification) {
+            throw new InvalidArgumentException('Notification not found.');
+        }
+        if (empty($notification['read_at'])) {
+            throw new InvalidArgumentException('Mark this notification as read before deleting it.');
+        }
+
+        $delete = database()->prepare(
+            'DELETE FROM notifications
+             WHERE id = :id AND user_id = :user_id AND read_at IS NOT NULL'
+        );
+        $delete->execute(['id' => $id, 'user_id' => $userId]);
+        if ($delete->rowCount() !== 1) {
+            throw new RuntimeException('The notification could not be deleted.');
+        }
+    }
+
     public static function markAllRead(int $userId): void
     {
         database()->prepare('UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE user_id = :user_id AND read_at IS NULL')->execute(['user_id' => $userId]);

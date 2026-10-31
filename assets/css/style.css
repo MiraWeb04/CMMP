@@ -2838,6 +2838,13 @@ body.cmmp-glass .cmmp-calendar-shell .fc .fc-button:hover {
     background: #fff;
 }
 
+.cmmp-note-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
 .cmmp-note-icon {
     width: 42px;
     height: 42px;
@@ -2928,7 +2935,8 @@ body.cmmp-glass .cmmp-calendar-shell .fc .fc-button:hover {
         grid-template-columns: auto 1fr;
     }
 
-    .cmmp-note form {
+    .cmmp-note form,
+    .cmmp-note-actions {
         grid-column: 2;
     }
 }
