@@ -55,9 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
 $currentUser = authenticated_user();
 $loggedIn = $currentUser !== null;
 
-function e(?string $value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+if (!function_exists('e')) {
+    function e(?string $value): string
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
 }
 
 $events = array_slice(Event::upcoming(0), 0, 3);

@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/event.php';
 
 require_role('MEMBER');
-$memberId = member_id_for_user((int) current_user_id());
+$memberId = member_id_for_user((int) current_user_id()) ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) { http_response_code(404); exit('Your member profile has not been created yet.'); }
 $events = Event::upcoming($memberId);
 $pageTitle = 'Church events';

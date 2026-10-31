@@ -5,7 +5,8 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/Counseling.php';
 require_role('MEMBER');
-$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $request = $id ? ServiceRequest::find($id) : null;
 if (!$request || (int) $request['requested_by_member_id'] !== $memberId || !empty($request['hidden_from_member_at'])) {

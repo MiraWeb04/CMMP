@@ -6,7 +6,8 @@ require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/ServiceRequest.php';
 
 require_role('MEMBER');
-$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) {
     http_response_code(404);
     exit('Your member profile has not been created yet.');

@@ -5,7 +5,8 @@ require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../models/Ministry.php';
 
 require_role('MEMBER');
-$memberId = Ministry::memberIdForUser((int) current_user_id());
+$memberId = Ministry::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) {
     http_response_code(404);
     exit('Your member profile has not been created yet.');

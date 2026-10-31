@@ -16,11 +16,19 @@ if (!$memberId) {
     exit('Your member profile has not been created yet.');
 }
 
-$requests = ServiceRequest::paginateForMember($memberId);
+try {
+    $requests = ServiceRequest::paginateForMember($memberId);
+    $events = Event::upcoming($memberId);
+    $announcements = Announcement::listForUser(current_user_roles());
+    $unread = Notification::unreadCount((int) current_user_id());
+} catch (Throwable $exception) {
+    error_log('CMMP member dashboard data failed: ' . $exception->getMessage());
+    $requests = [];
+    $events = [];
+    $announcements = [];
+    $unread = 0;
+}
 $openRequests = array_values(array_filter($requests, static fn(array $item): bool => !in_array($item['status'], ['COMPLETED', 'REJECTED', 'CANCELLED'], true)));
-$events = Event::upcoming($memberId);
-$announcements = Announcement::listForUser(current_user_roles());
-$unread = Notification::unreadCount((int) current_user_id());
 
 $dashboardTitle = 'Member dashboard';
 $dashboardLead = 'Check the church calendar, send a service or facility request, and follow your request status.';

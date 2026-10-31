@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/../helpers/schema_guard.php';
 
 cmmp_load_environment();
 
@@ -37,6 +38,7 @@ function database(): PDO
                 PDO::ATTR_EMULATE_PREPARES => false,
                 PDO::ATTR_TIMEOUT => 5,
             ]);
+            cmmp_ensure_schema($connection);
             return $connection;
         } catch (PDOException $exception) {
             $lastException = $exception;

@@ -16,7 +16,7 @@ function start_secure_session(): void
 
     session_set_cookie_params([
         'lifetime' => 0,
-        'path' => session_cookie_path(),
+        'path' => '/',
         'secure' => $isHttps,
         'httponly' => true,
         'samesite' => 'Lax',
@@ -241,17 +241,21 @@ function ensure_member_profile(int $userId): ?int
     }
 
     require_once __DIR__ . '/../models/Member.php';
-    $memberId = Member::createFromRegistration($userId, [
-        'first_name' => trim((string) ($row['username'] ?: 'Member')),
-        'last_name' => 'Member',
-        'email' => (string) ($row['email'] ?? ''),
-    ]);
-    database()->prepare(
-        'UPDATE members SET membership_status = "ACTIVE", joined_at = CURDATE() WHERE id = :id'
-    )->execute(['id' => $memberId]);
-    ensure_member_role($userId);
-
-    return $memberId;
+    try {
+        $memberId = Member::createFromRegistration($userId, [
+            'first_name' => trim((string) ($row['username'] ?: 'Member')),
+            'last_name' => 'Member',
+            'email' => (string) ($row['email'] ?? ''),
+        ]);
+        database()->prepare(
+            'UPDATE members SET membership_status = "ACTIVE", joined_at = CURDATE() WHERE id = :id'
+        )->execute(['id' => $memberId]);
+        ensure_member_role($userId);
+        return $memberId;
+    } catch (Throwable $exception) {
+        error_log('CMMP could not create a member profile: ' . $exception->getMessage());
+        return member_id_for_user($userId);
+    }
 }
 
 function require_role(string|array $roles): void
