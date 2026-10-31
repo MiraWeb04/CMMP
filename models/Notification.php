@@ -81,6 +81,47 @@ final class Notification
         }
     }
 
+    public static function deleteManyForUser(array $ids, int $userId): int
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $ids),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            throw new InvalidArgumentException('Select at least one notification to delete.');
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $parameters = $ids;
+        $parameters[] = $userId;
+        $delete = database()->prepare(
+            "DELETE FROM notifications WHERE id IN ($placeholders) AND user_id = ?"
+        );
+        $delete->execute($parameters);
+        $deleted = $delete->rowCount();
+        if ($deleted < 1) {
+            throw new InvalidArgumentException('Notification not found.');
+        }
+
+        return $deleted;
+    }
+
+    public static function deleteAllForUser(int $userId): int
+    {
+        $delete = database()->prepare('DELETE FROM notifications WHERE user_id = :user_id');
+        $delete->execute(['user_id' => $userId]);
+
+        return $delete->rowCount();
+    }
+
+    public static function countForUser(int $userId): int
+    {
+        $query = database()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = :user_id');
+        $query->execute(['user_id' => $userId]);
+
+        return (int) $query->fetchColumn();
+    }
+
     public static function deleteReadForUser(int $id, int $userId): void
     {
         self::deleteForUser($id, $userId);
