@@ -16,7 +16,7 @@ function start_secure_session(): void
 
     session_set_cookie_params([
         'lifetime' => 0,
-        'path' => '/',
+        'path' => session_cookie_path(),
         'secure' => $isHttps,
         'httponly' => true,
         'samesite' => 'Lax',
@@ -32,7 +32,7 @@ function is_logged_in(): bool
 {
     start_secure_session();
 
-    return isset($_SESSION['user_id']) && is_int($_SESSION['user_id']);
+    return isset($_SESSION['user_id']) && (int) $_SESSION['user_id'] > 0;
 }
 
 function authenticated_user(): ?array
@@ -52,6 +52,10 @@ function authenticated_user(): ?array
         return null;
     }
 
+    if (member_id_for_user((int) $user['id'])) {
+        ensure_member_role((int) $user['id']);
+    }
+
     return $user;
 }
 
@@ -69,8 +73,28 @@ function current_user_roles(): array
          ORDER BY r.code'
     );
     $statement->execute(['user_id' => $_SESSION['user_id']]);
+    $roles = array_column($statement->fetchAll(), 'code');
+    if ($roles !== []) {
+        return $roles;
+    }
 
-    return array_column($statement->fetchAll(), 'code');
+    $legacy = database()->prepare('SELECT role FROM users WHERE id = :id LIMIT 1');
+    $legacy->execute(['id' => $_SESSION['user_id']]);
+    $code = trim((string) $legacy->fetchColumn());
+    if ($code === '') {
+        return [];
+    }
+
+    $roleId = database()->prepare('SELECT id FROM roles WHERE code = :code LIMIT 1');
+    $roleId->execute(['code' => $code]);
+    $id = $roleId->fetchColumn();
+    if ($id !== false) {
+        database()->prepare(
+            'INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)'
+        )->execute(['user_id' => $_SESSION['user_id'], 'role_id' => (int) $id]);
+    }
+
+    return [$code];
 }
 
 function authenticate_user(string $identifier, string $password): ?array
@@ -82,7 +106,7 @@ function authenticate_user(string $identifier, string $password): ?array
     }
 
     $statement = database()->prepare(
-        'SELECT u.id, u.username, u.email, u.password_hash, u.status,
+        'SELECT u.id, u.username, u.email, u.password_hash, u.status, u.role,
                 GROUP_CONCAT(r.code ORDER BY r.code SEPARATOR ",") AS role_codes
          FROM users u
          LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -112,6 +136,12 @@ function authenticate_user(string $identifier, string $password): ?array
     $user['roles'] = $user['role_codes'] === null || $user['role_codes'] === ''
         ? []
         : explode(',', $user['role_codes']);
+    if ($user['roles'] === [] && !empty($user['role'])) {
+        $user['roles'] = [(string) $user['role']];
+    }
+    if (member_id_for_user((int) $user['id']) && !in_array('MEMBER', $user['roles'], true)) {
+        $user['roles'][] = 'MEMBER';
+    }
 
     return $user;
 }
@@ -164,14 +194,96 @@ function require_login(): void
     }
 }
 
+function member_id_for_user(?int $userId): ?int
+{
+    if (!$userId) {
+        return null;
+    }
+
+    $query = database()->prepare('SELECT id FROM members WHERE user_id = :user_id LIMIT 1');
+    $query->execute(['user_id' => $userId]);
+    $id = $query->fetchColumn();
+
+    return $id === false ? null : (int) $id;
+}
+
+function ensure_member_role(int $userId): void
+{
+    $role = database()->prepare('SELECT id FROM roles WHERE code = :code LIMIT 1');
+    $role->execute(['code' => 'MEMBER']);
+    $roleId = $role->fetchColumn();
+    if ($roleId === false) {
+        return;
+    }
+
+    database()->prepare(
+        'INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)'
+    )->execute(['user_id' => $userId, 'role_id' => (int) $roleId]);
+}
+
+function ensure_member_profile(int $userId): ?int
+{
+    $existing = member_id_for_user($userId);
+    if ($existing) {
+        ensure_member_role($userId);
+        return $existing;
+    }
+
+    if (!has_role('MEMBER')) {
+        return null;
+    }
+
+    $user = database()->prepare('SELECT username, email FROM users WHERE id = :id LIMIT 1');
+    $user->execute(['id' => $userId]);
+    $row = $user->fetch();
+    if (!$row) {
+        return null;
+    }
+
+    require_once __DIR__ . '/../models/Member.php';
+    $memberId = Member::createFromRegistration($userId, [
+        'first_name' => trim((string) ($row['username'] ?: 'Member')),
+        'last_name' => 'Member',
+        'email' => (string) ($row['email'] ?? ''),
+    ]);
+    database()->prepare(
+        'UPDATE members SET membership_status = "ACTIVE", joined_at = CURDATE() WHERE id = :id'
+    )->execute(['id' => $memberId]);
+    ensure_member_role($userId);
+
+    return $memberId;
+}
+
 function require_role(string|array $roles): void
 {
     require_login();
 
-    if (!has_role($roles)) {
-        http_response_code(403);
-        exit('You are not authorized to access this page.');
+    $required = (array) $roles;
+    if (in_array('MEMBER', $required, true) && count($required) === 1) {
+        $userId = (int) current_user_id();
+        if (member_id_for_user($userId) || has_role('MEMBER')) {
+            if (ensure_member_profile($userId)) {
+                return;
+            }
+        }
     }
+
+    if (has_role($required)) {
+        return;
+    }
+
+    http_response_code(403);
+    $home = APP_BASE_URL . role_redirect_path(current_user_roles());
+    $label = htmlspecialchars(role_display_label(), ENT_QUOTES, 'UTF-8');
+    $safeHome = htmlspecialchars($home, ENT_QUOTES, 'UTF-8');
+    exit(
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<title>Access needed - CMMP</title></head><body style="font-family:Arial,sans-serif;max-width:560px;margin:64px auto;padding:0 16px">'
+        . '<h1>This page is for church members</h1>'
+        . '<p>You are signed in as <strong>' . $label . '</strong>. The member dashboard opens only for an account that has the Member role or a member record.</p>'
+        . '<p><a href="' . $safeHome . '">Open your dashboard</a></p>'
+        . '</body></html>'
+    );
 }
 
 function login_user(int $userId, array $roles): void
@@ -190,7 +302,7 @@ function logout_user(): void
 
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'] ?? '',
+        setcookie(session_name(), '', time() - 42000, $params['path'] ?: session_cookie_path(), $params['domain'] ?? '',
             (bool) $params['secure'], (bool) $params['httponly']);
     }
 

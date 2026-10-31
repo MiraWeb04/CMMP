@@ -16,7 +16,10 @@ $navCounts = nav_attention_counts();
 		<nav class="cmmp-nav px-3" aria-label="Primary navigation">
 			<?php foreach ($navigationGroups as $group): ?>
 				<?php $isStaffDashboardGroup = $group['label'] === 'Overview' && array_filter($group['items'], static fn (array $item): bool => $item['key'] === 'admin-dashboard'); ?>
-				<?php if ($staffOnlyView && (in_array($group['label'], ['Member Portal', 'Administration', 'Ministry & Care'], true) || ($group['label'] === 'Overview' && !$isStaffDashboardGroup))): ?>
+				<?php if ($staffOnlyView && (in_array($group['label'], ['Administration', 'Ministry & Care'], true) || ($group['label'] === 'Overview' && !$isStaffDashboardGroup))): ?>
+					<?php continue; ?>
+				<?php endif; ?>
+				<?php if ($staffOnlyView && $group['label'] === 'Member Portal' && !has_role('MEMBER')): ?>
 					<?php continue; ?>
 				<?php endif; ?>
 				<?php $visibleItems = array_values(array_filter($group['items'], static fn (array $item): bool => has_role($item['roles']))); ?>

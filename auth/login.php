@@ -18,8 +18,13 @@ if (isset($_GET['logged_out']) && $_GET['logged_out'] === '1') {
     $message = 'You have been logged out successfully.';
 }
 
-if (is_logged_in()) {
-    header('Location: ' . $redirect);
+if (authenticated_user()) {
+    $target = $_GET['redirect'] ?? null;
+    if ($target !== null && $target !== '' && str_starts_with($target, '/')) {
+        header('Location: ' . safe_redirect_target($target));
+    } else {
+        header('Location: ' . APP_BASE_URL . role_redirect_path(current_user_roles()));
+    }
     exit;
 }
 

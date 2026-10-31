@@ -163,6 +163,17 @@ final class Member
         $query->execute($data);
 
         $memberId = (int) database()->lastInsertId();
+        $linkedUserId = filter_var($data['user_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($linkedUserId) {
+            $role = database()->prepare('SELECT id FROM roles WHERE code = :code LIMIT 1');
+            $role->execute(['code' => 'MEMBER']);
+            $roleId = $role->fetchColumn();
+            if ($roleId !== false) {
+                database()->prepare(
+                    'INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)'
+                )->execute(['user_id' => $linkedUserId, 'role_id' => (int) $roleId]);
+            }
+        }
         if (($data['membership_status'] ?? 'ACTIVE') === 'ACTIVE') {
             fellowship_sync_member(
                 $memberId,

@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
 
         if ($user === null) {
             $errors[] = 'Invalid login credentials.';
+        } elseif (($user['status'] ?? '') === 'LOCKED_TEMPORARY') {
+            $errors[] = 'Too many failed sign-in attempts. Wait 15 minutes and try again, or use Forgot password.';
         } elseif (($user['status'] ?? '') === 'PENDING') {
             $errors[] = 'Your registration is waiting for a church administrator to approve it.';
         } elseif (($user['status'] ?? 'INACTIVE') !== 'ACTIVE') {
@@ -43,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
                 $update = database()->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
                 $update->execute(['id' => (int) $user['id']]);
 
-                header('Location: ' . APP_BASE_URL . '/member-portal.php');
+                header('Location: ' . APP_BASE_URL . role_redirect_path($roles));
                 exit;
             }
         }
