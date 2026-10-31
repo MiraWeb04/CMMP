@@ -53,6 +53,13 @@ $unread = (int) $notificationInbox['unread'];
     <?php endif; ?>
 </form>
 
+<?php if (isset($_GET['deleted'])): ?>
+    <div class="alert alert-success">The notification was deleted. Related church records were not changed.</div>
+<?php endif; ?>
+<?php if (!empty($_GET['delete_error'])): ?>
+    <div class="alert alert-danger"><?= e((string) $_GET['delete_error']) ?></div>
+<?php endif; ?>
+
 <div class="cmmp-note-list">
     <?php foreach ($items as $item): ?>
         <?php $isUnread = empty($item['read_at']); ?>
@@ -75,18 +82,31 @@ $unread = (int) $notificationInbox['unread'];
                     <?php endif; ?>
                 </div>
             </div>
-            <?php if ($isUnread): ?>
-                <form method="post">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="action" value="read">
-                    <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                    <input type="hidden" name="q" value="<?= e($filters['q']) ?>">
-                    <input type="hidden" name="status" value="<?= e($filters['status']) ?>">
-                    <input type="hidden" name="type" value="<?= e($filters['type']) ?>">
-                    <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
-                    <button class="btn btn-sm btn-outline-primary" type="submit">Mark read</button>
-                </form>
-            <?php endif; ?>
+            <div class="cmmp-note-actions">
+                <?php if ($isUnread): ?>
+                    <form method="post">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="read">
+                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                        <input type="hidden" name="q" value="<?= e($filters['q']) ?>">
+                        <input type="hidden" name="status" value="<?= e($filters['status']) ?>">
+                        <input type="hidden" name="type" value="<?= e($filters['type']) ?>">
+                        <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
+                        <button class="btn btn-sm btn-outline-primary" type="submit">Mark read</button>
+                    </form>
+                <?php else: ?>
+                    <form method="post" onsubmit="return confirm('Delete this read notification? Related service requests, appointments, and events will not be deleted.');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                        <input type="hidden" name="q" value="<?= e($filters['q']) ?>">
+                        <input type="hidden" name="status" value="<?= e($filters['status']) ?>">
+                        <input type="hidden" name="type" value="<?= e($filters['type']) ?>">
+                        <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                    </form>
+                <?php endif; ?>
+            </div>
         </article>
     <?php endforeach; ?>
     <?php if ($items === []): ?>
