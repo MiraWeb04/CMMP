@@ -35,12 +35,16 @@ final class MailService
 
         $lastError = 'Email delivery is temporarily unavailable.';
         foreach (self::transportProfiles($config) as $profile) {
-            try {
-                self::sendWithProfile($config, $profile, $toAddress, $subject, $body, $html);
-                return;
-            } catch (Throwable $exception) {
-                $lastError = $exception->getMessage();
-                error_log('CMMP email delivery failed (' . $profile['port'] . '/' . $profile['encryption'] . '): ' . $lastError);
+            foreach (['LOGIN', 'PLAIN'] as $authType) {
+                try {
+                    self::sendWithProfile($config, $profile, $authType, $toAddress, $subject, $body, $html);
+                    return;
+                } catch (Throwable $exception) {
+                    $lastError = $exception->getMessage();
+                    error_log(
+                        'CMMP email delivery failed (' . $profile['port'] . '/' . $profile['encryption'] . '/' . $authType . '): ' . $lastError
+                    );
+                }
             }
         }
 
@@ -103,6 +107,7 @@ final class MailService
     private static function sendWithProfile(
         array $config,
         array $profile,
+        string $authType,
         string $toAddress,
         string $subject,
         string $body,
@@ -114,7 +119,7 @@ final class MailService
             $mail->Host = $config['host'];
             $mail->Port = $profile['port'];
             $mail->SMTPAuth = true;
-            $mail->AuthType = 'LOGIN';
+            $mail->AuthType = $authType;
             $mail->Username = $config['username'];
             $mail->Password = $config['password'];
             $mail->SMTPSecure = $profile['encryption'] === 'ssl'
