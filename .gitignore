@@ -11,3 +11,6 @@ id_rsa.pub
 
 # Installed PHP dependencies
 /vendor/
+
+# Local database backups
+/backups/*.sql

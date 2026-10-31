@@ -27,8 +27,13 @@ final class Member
         $parameters = [];
 
         if ($filters['search'] !== '') {
-            $conditions[] = '(m.member_number LIKE :search OR m.first_name LIKE :search OR m.middle_name LIKE :search OR m.last_name LIKE :search OR m.email LIKE :search)';
-            $parameters['search'] = '%' . $filters['search'] . '%';
+            $term = '%' . $filters['search'] . '%';
+            $conditions[] = '(m.member_number LIKE :search_number OR m.first_name LIKE :search_first OR m.middle_name LIKE :search_middle OR m.last_name LIKE :search_last OR m.email LIKE :search_email)';
+            $parameters['search_number'] = $term;
+            $parameters['search_first'] = $term;
+            $parameters['search_middle'] = $term;
+            $parameters['search_last'] = $term;
+            $parameters['search_email'] = $term;
         }
         if ($filters['status'] !== '') {
             $conditions[] = 'm.membership_status = :status';

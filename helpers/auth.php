@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/http.php';
 
 function start_secure_session(): void
 {
@@ -11,8 +12,7 @@ function start_secure_session(): void
         return;
     }
 
-    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['SERVER_PORT'] ?? null) === '443');
+    $isHttps = request_is_https();
 
     session_set_cookie_params([
         'lifetime' => 0,
@@ -75,6 +75,12 @@ function current_user_roles(): array
 
 function authenticate_user(string $identifier, string $password): ?array
 {
+    require_once __DIR__ . '/../models/User.php';
+    $ip = request_client_ip();
+    if (User::isTemporarilyLocked($identifier, $ip)) {
+        return ['status' => 'LOCKED_TEMPORARY'];
+    }
+
     $statement = database()->prepare(
         'SELECT u.id, u.username, u.email, u.password_hash, u.status,
                 GROUP_CONCAT(r.code ORDER BY r.code SEPARATOR ",") AS role_codes
@@ -92,12 +98,16 @@ function authenticate_user(string $identifier, string $password): ?array
     $user = $statement->fetch();
 
     if (!$user || !password_verify($password, $user['password_hash'])) {
+        User::recordLoginAttempt($identifier, $ip, false);
         return null;
     }
 
     if ($user['status'] !== 'ACTIVE') {
+        User::recordLoginAttempt($identifier, $ip, false);
         return ['status' => $user['status']];
     }
+
+    User::recordLoginAttempt($identifier, $ip, true);
 
     $user['roles'] = $user['role_codes'] === null || $user['role_codes'] === ''
         ? []

@@ -237,7 +237,7 @@ final class ServiceRequest
         }
     }
 
-    public static function paginateForAdmin(string $search, string $status): array
+    public static function paginateForAdmin(string $search, string $status, int $page = 0, int $perPage = 15): array
     {
         $conditions = [];
         $parameters = [];
@@ -253,17 +253,37 @@ final class ServiceRequest
             $parameters['status'] = $status;
         }
         $where = $conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions);
-        $query = database()->prepare(
-            "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
+        $select = "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
                     COALESCE(st.name, 'Unknown Service') AS service_name,
                     COALESCE(CONCAT(m.first_name, ' ', m.last_name), 'Unknown Member') AS member_name
              FROM service_requests sr
              LEFT JOIN service_types st ON st.id = sr.service_type_id
              LEFT JOIN members m ON m.id = sr.requested_by_member_id
-             $where ORDER BY sr.created_at DESC"
+             $where ORDER BY sr.created_at DESC";
+
+        if ($page < 1) {
+            $query = database()->prepare($select);
+            $query->execute($parameters);
+            return $query->fetchAll();
+        }
+
+        $count = database()->prepare(
+            "SELECT COUNT(*) FROM service_requests sr
+             LEFT JOIN members m ON m.id = sr.requested_by_member_id
+             $where"
         );
-        $query->execute($parameters);
-        return $query->fetchAll();
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+
+        $query = database()->prepare($select . ' LIMIT :limit OFFSET :offset');
+        foreach ($parameters as $key => $value) {
+            $query->bindValue(':' . $key, $value, PDO::PARAM_STR);
+        }
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
+        $query->execute();
+
+        return ['items' => $query->fetchAll(), 'total' => $total];
     }
 
     public static function paginateForAssignedStaff(int $staffId, string $search = '', string $status = ''): array
@@ -271,8 +291,11 @@ final class ServiceRequest
         $conditions = ['sa.staff_id = :staff_id'];
         $parameters = ['staff_id' => $staffId];
         if ($search !== '') {
-            $conditions[] = '(sr.request_number LIKE :search OR sr.subject LIKE :search OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(sr.request_number LIKE :search_number OR sr.subject LIKE :search_subject OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search_name)';
+            $parameters['search_number'] = $term;
+            $parameters['search_subject'] = $term;
+            $parameters['search_name'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'sr.status = :status';

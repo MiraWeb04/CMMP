@@ -23,8 +23,10 @@ final class Event
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(e.title LIKE :search OR e.description LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(e.title LIKE :search_title OR e.description LIKE :search_description)';
+            $parameters['search_title'] = $term;
+            $parameters['search_description'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'e.event_status = :status';

@@ -5,8 +5,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/csrf.php';
 require_once __DIR__ . '/../helpers/audit.php';
+require_once __DIR__ . '/../helpers/http.php';
 
 start_secure_session();
+send_security_headers();
 $errors = [];
 $identifier = '';
 $redirect = safe_redirect_target($_GET['redirect'] ?? null);
@@ -33,6 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($user === null) {
             $errors[] = 'Invalid login credentials.';
+        } elseif (($user['status'] ?? '') === 'LOCKED_TEMPORARY') {
+            $errors[] = 'Too many failed sign-in attempts. Wait 15 minutes and try again, or use Forgot password.';
         } elseif (($user['status'] ?? '') === 'PENDING') {
             $errors[] = 'Your registration is waiting for a church administrator to approve it.';
         } elseif (!isset($user['status']) || $user['status'] !== 'ACTIVE') {

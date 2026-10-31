@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS users (
 	UNIQUE KEY uq_users_username (username),
 	UNIQUE KEY uq_users_email (email),
 	KEY idx_users_status (status),
-	KEY idx_users_role (role)
+	KEY idx_users_role (role),
+	KEY idx_users_last_login (last_login_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS members (
 	UNIQUE KEY uq_members_number (member_number),
 	KEY idx_members_name (last_name, first_name),
 	KEY idx_members_status (membership_status),
+	KEY idx_members_email (email),
 	CONSTRAINT fk_members_user FOREIGN KEY (user_id) REFERENCES users (id)
 		ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
@@ -190,6 +192,7 @@ CREATE TABLE IF NOT EXISTS ministries (
 	id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
 	name VARCHAR(150) NOT NULL,
 	code VARCHAR(50) NOT NULL,
+	leader_staff_id BIGINT UNSIGNED NULL,
 	description TEXT NULL,
 	ministry_status ENUM('ACTIVE', 'INACTIVE') NOT NULL DEFAULT 'ACTIVE',
 	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -197,7 +200,10 @@ CREATE TABLE IF NOT EXISTS ministries (
 	PRIMARY KEY (id),
 	UNIQUE KEY uq_ministries_code (code),
 	UNIQUE KEY uq_ministries_name (name),
-	KEY idx_ministries_status (ministry_status)
+	KEY idx_ministries_status (ministry_status),
+	KEY idx_ministries_leader (leader_staff_id),
+	CONSTRAINT fk_ministries_leader FOREIGN KEY (leader_staff_id) REFERENCES staff (id)
+		ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS ministry_members (
@@ -269,6 +275,7 @@ CREATE TABLE IF NOT EXISTS events (
 	PRIMARY KEY (id),
 	KEY idx_events_schedule (start_datetime, end_datetime),
 	KEY idx_events_status (event_status),
+	KEY idx_events_title (title),
 	KEY idx_events_category (category_id),
 	KEY idx_events_facility (facility_id),
 	CONSTRAINT fk_events_creator FOREIGN KEY (created_by_user_id) REFERENCES users (id)
@@ -374,6 +381,7 @@ CREATE TABLE IF NOT EXISTS service_requests (
 	KEY idx_service_requests_type_status (service_type_id, status),
 	KEY idx_service_requests_member (requested_by_member_id),
 	KEY idx_service_requests_status (status),
+	KEY idx_service_requests_requested_at (requested_at),
 	KEY idx_service_requests_member_hidden (requested_by_member_id, hidden_from_member_at),
 	CONSTRAINT fk_service_requests_type FOREIGN KEY (service_type_id) REFERENCES service_types (id)
 		ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -669,6 +677,31 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 	KEY idx_activity_logs_action (action, created_at),
 	CONSTRAINT fk_activity_logs_user FOREIGN KEY (user_id) REFERENCES users (id)
 		ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+	id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	identifier VARCHAR(255) NOT NULL,
+	ip_address VARCHAR(45) NOT NULL,
+	was_successful TINYINT(1) NOT NULL DEFAULT 0,
+	attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id),
+	KEY idx_login_attempts_lookup (identifier, attempted_at),
+	KEY idx_login_attempts_ip (ip_address, attempted_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+	id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+	user_id BIGINT UNSIGNED NOT NULL,
+	token_hash CHAR(64) NOT NULL,
+	expires_at DATETIME NOT NULL,
+	used_at DATETIME NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id),
+	UNIQUE KEY uq_password_reset_hash (token_hash),
+	KEY idx_password_reset_user (user_id, expires_at),
+	CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users (id)
+		ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- Initial service catalog. Request-specific data remains in service_requests.

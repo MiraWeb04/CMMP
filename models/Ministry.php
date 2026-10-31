@@ -49,6 +49,27 @@ final class Ministry
         return $ministries;
     }
 
+    public static function paginateAdmin(int $page, int $perPage): array
+    {
+        $total = (int) database()->query('SELECT COUNT(*) FROM ministries')->fetchColumn();
+        $query = database()->prepare(
+            'SELECT m.id, m.name, m.code, m.description, m.ministry_status,
+                    COALESCE(CONCAT(leader_member.first_name, " ", leader_member.last_name), "Not assigned") AS leader_name,
+                    COUNT(DISTINCT mm.member_id) AS member_count
+             FROM ministries m
+             LEFT JOIN staff leader_staff ON leader_staff.id = m.leader_staff_id
+             LEFT JOIN members leader_member ON leader_member.id = leader_staff.member_id
+             LEFT JOIN ministry_members mm ON mm.ministry_id = m.id AND mm.left_at IS NULL
+             GROUP BY m.id
+             ORDER BY m.name
+             LIMIT :limit OFFSET :offset'
+        );
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
+        $query->execute();
+        return ['items' => $query->fetchAll(), 'total' => $total];
+    }
+
     public static function find(int $id): ?array
     {
         $query = database()->prepare(

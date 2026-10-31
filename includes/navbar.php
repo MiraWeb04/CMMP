@@ -41,6 +41,7 @@ $notificationUnread = Notification::unreadCount((int) ($currentUser['id'] ?? 0))
 				<ul class="dropdown-menu dropdown-menu-end shadow-sm">
 					<li><span class="dropdown-item-text small text-muted"><?= e(implode(' / ', $currentRoles)) ?></span></li>
 					<li><hr class="dropdown-divider"></li>
+					<li><a class="dropdown-item" href="<?= e(in_array('MEMBER', $currentRoles, true) && !array_intersect($currentRoles, ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR', 'COUNSELOR', 'MINISTRY_LEADER']) ? APP_BASE_URL . '/member/profile/' : APP_BASE_URL . '/account/profile.php') ?>"><i class="fa-solid fa-user me-2"></i>My profile</a></li>
 					<li><a class="dropdown-item" href="<?= e(APP_BASE_URL) ?>/auth/logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Log out</a></li>
 				</ul>
 			</div>

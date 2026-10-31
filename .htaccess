@@ -1,7 +1,7 @@
 Options -Indexes
 
 RewriteEngine On
-RewriteRule ^(?:config|database|logs|uploads|vendor)(?:/|$) - [F,L]
+RewriteRule ^(?:config|database|logs|uploads|vendor|backups)(?:/|$) - [F,L]
 
 <FilesMatch "(^|\.)env$|^\.env\.|\.sql$|\.log$">
     Require all denied

@@ -38,6 +38,25 @@ final class Announcement
         return $query->fetchAll();
     }
     public static function all(): array { return database()->query('SELECT * FROM announcements ORDER BY created_at DESC')->fetchAll(); }
+
+    public static function paginate(int $page, int $perPage): array
+    {
+        $total = (int) database()->query('SELECT COUNT(*) FROM announcements')->fetchColumn();
+        $query = database()->prepare(
+            'SELECT * FROM announcements ORDER BY created_at DESC LIMIT :limit OFFSET :offset'
+        );
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
+        $query->execute();
+        return ['items' => $query->fetchAll(), 'total' => $total];
+    }
+
+    public static function archive(int $id, ?int $userId = null): void
+    {
+        $query = database()->prepare('UPDATE announcements SET announcement_status = "ARCHIVED" WHERE id = :id');
+        $query->execute(['id' => $id]);
+        AuditLog::record($userId, 'ANNOUNCEMENT_ARCHIVED', 'ANNOUNCEMENT', $id);
+    }
     public static function save(array $data, ?int $id=null): int
     {
         require_once __DIR__ . '/../services/NotificationService.php';
