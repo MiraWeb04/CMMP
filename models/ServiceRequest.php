@@ -188,25 +188,15 @@ final class ServiceRequest
 
     public static function memberCanHide(array $request, int $memberId): bool
     {
-        if ((int) ($request['requested_by_member_id'] ?? 0) !== $memberId) {
+        $ownerId = (int) ($request['requested_by_member_id'] ?? 0);
+        if ($ownerId > 0 && $ownerId !== $memberId) {
             return false;
         }
         if (!empty($request['hidden_from_member_at'])) {
             return false;
         }
-        if (($request['status'] ?? '') !== 'COMPLETED') {
-            return false;
-        }
 
-        $occurredAt = $request['preferred_end_datetime']
-            ?: ($request['preferred_start_datetime'] ?? null)
-            ?: ($request['completed_at'] ?? null);
-        if ($occurredAt === null || trim((string) $occurredAt) === '') {
-            return true;
-        }
-
-        $timestamp = strtotime((string) $occurredAt);
-        return $timestamp !== false && $timestamp <= time();
+        return ($request['status'] ?? '') === 'COMPLETED';
     }
 
     public static function hideFromMember(int $requestId, int $memberId, ?int $userId = null): void
@@ -225,7 +215,7 @@ final class ServiceRequest
         }
         if (!self::memberCanHide($request, $memberId)) {
             throw new InvalidArgumentException(
-                'Only your own completed requests that have already taken place can be removed from your dashboard.'
+                'Only your own completed requests can be deleted from your list.'
             );
         }
 
@@ -239,7 +229,7 @@ final class ServiceRequest
         );
         $update->execute(['id' => $requestId, 'member_id' => $memberId]);
         if ($update->rowCount() !== 1) {
-            throw new RuntimeException('The request could not be removed from your dashboard.');
+            throw new RuntimeException('The request could not be deleted from your list.');
         }
 
         if ($userId) {

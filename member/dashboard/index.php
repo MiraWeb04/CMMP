@@ -50,7 +50,7 @@ foreach (array_slice($requests, 0, 6) as $request) {
         ob_start();
         $hideRequestId = (int) $request['id'];
         $hideReturnTo = 'dashboard';
-        $hideButtonLabel = 'Remove';
+        $hideButtonLabel = 'Delete';
         require __DIR__ . '/../../includes/member-hide-request-form.php';
         $actionHtml = (string) ob_get_clean();
     }
@@ -65,7 +65,7 @@ foreach (array_slice($requests, 0, 6) as $request) {
 $dashboardNotice = '';
 $dashboardNoticeClass = 'alert-success';
 if (isset($_GET['hidden'])) {
-    $dashboardNotice = 'The completed request was removed from your dashboard. Church staff still have the original record.';
+    $dashboardNotice = 'The completed request was deleted from your list. Church staff still have the original record.';
 } elseif (!empty($_GET['hide_error'])) {
     $dashboardNotice = (string) $_GET['hide_error'];
     $dashboardNoticeClass = 'alert-danger';

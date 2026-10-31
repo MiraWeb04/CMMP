@@ -6,8 +6,8 @@ require_once __DIR__ . '/../helpers/csrf.php';
 $requestId = (int) ($hideRequestId ?? 0);
 $returnTo = (string) ($hideReturnTo ?? 'services');
 $buttonClass = (string) ($hideButtonClass ?? 'btn btn-sm btn-outline-danger');
-$buttonLabel = (string) ($hideButtonLabel ?? 'Remove');
-$confirmMessage = 'Remove this completed request from your dashboard? Church staff will still keep the original record.';
+$buttonLabel = (string) ($hideButtonLabel ?? 'Delete');
+$confirmMessage = 'Delete this completed request from your list? Church staff will still keep the original record.';
 ?>
 <form method="post" action="<?= e(APP_BASE_URL) ?>/member/services/hide.php" class="d-inline" onsubmit="return confirm(<?= json_encode($confirmMessage) ?>);">
     <?= csrf_field() ?>
