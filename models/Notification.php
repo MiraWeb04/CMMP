@@ -65,24 +65,25 @@ final class Notification
         return $notification ?: null;
     }
 
-    public static function deleteReadForUser(int $id, int $userId): void
+    public static function deleteForUser(int $id, int $userId): void
     {
         $notification = self::findForUser($id, $userId);
         if (!$notification) {
             throw new InvalidArgumentException('Notification not found.');
         }
-        if (empty($notification['read_at'])) {
-            throw new InvalidArgumentException('Mark this notification as read before deleting it.');
-        }
 
         $delete = database()->prepare(
-            'DELETE FROM notifications
-             WHERE id = :id AND user_id = :user_id AND read_at IS NOT NULL'
+            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id'
         );
         $delete->execute(['id' => $id, 'user_id' => $userId]);
         if ($delete->rowCount() !== 1) {
             throw new RuntimeException('The notification could not be deleted.');
         }
+    }
+
+    public static function deleteReadForUser(int $id, int $userId): void
+    {
+        self::deleteForUser($id, $userId);
     }
 
     public static function markAllRead(int $userId): void

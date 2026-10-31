@@ -355,9 +355,10 @@ try {
         && str_contains($servicesIndex, 'Church staff still have the original record')
     );
 
-    $canDeleteNotifications = method_exists(Notification::class, 'deleteReadForUser');
+    $canDeleteNotifications = method_exists(Notification::class, 'deleteForUser')
+        || method_exists(Notification::class, 'deleteReadForUser');
     if (!$canDeleteNotifications) {
-        echo "SKIP  Notification delete tests (deleteReadForUser is not on this branch).\n";
+        echo "SKIP  Notification delete tests (delete API is not on this branch).\n";
     } else {
         $unreadId = insertNotification(
             $pdo, $memberUserId, "Unread {$suffix}", 'Please review your schedule.',
@@ -392,16 +393,12 @@ try {
             $pdo, $memberUserId, "Unread stay {$suffix}", 'Stay until marked read.',
             'TEST', null, null, null, $createdNotificationIds
         );
-        [$blockedUnread, $unreadMessage] = expectException(
-            static fn () => Notification::deleteReadForUser($unreadAgainId, $memberUserId),
-            'Mark this notification as read'
-        );
-        verify('Unread notifications cannot be deleted', $blockedUnread, $unreadMessage);
-        $unreadStillThere = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $unreadAgainId)->fetchColumn();
-        verify('Unread notification row remains after a rejected delete', $unreadStillThere === 1);
+        Notification::deleteForUser($unreadAgainId, $memberUserId);
+        $unreadGone = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $unreadAgainId)->fetchColumn();
+        verify('Unread notifications can be deleted by the owner', $unreadGone === 0);
 
         [$blockedForeign, $foreignMessage] = expectException(
-            static fn () => Notification::deleteReadForUser($otherReadId, $memberUserId),
+            static fn () => Notification::deleteForUser($otherReadId, $memberUserId),
             'Notification not found'
         );
         verify('Users cannot delete another user\'s notification', $blockedForeign, $foreignMessage);
@@ -409,11 +406,11 @@ try {
         verify('Other user\'s notification row remains', $otherStillThere === 1);
 
         [$blockedAdminOwned] = expectException(
-            static fn () => Notification::deleteReadForUser($adminReadId, $memberUserId)
+            static fn () => Notification::deleteForUser($adminReadId, $memberUserId)
         );
         verify('Member cannot delete an admin notification', $blockedAdminOwned);
 
-        Notification::deleteReadForUser($readId, $memberUserId);
+        Notification::deleteForUser($readId, $memberUserId);
         $deleted = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $readId)->fetchColumn();
         $linkedRequest = (int) $pdo->query('SELECT COUNT(*) FROM service_requests WHERE id = ' . $eligibleId)->fetchColumn();
         verify('Read notification belonging to the user is deleted', $deleted === 0);
@@ -430,7 +427,7 @@ try {
         verify(
             'Notification delete confirmation dialog is present',
             is_string($inboxView)
-            && str_contains($inboxView, 'Delete this read notification?')
+            && str_contains($inboxView, 'Delete this notification?')
             && str_contains($inboxView, 'Related service requests, appointments, and events will not be deleted.')
             && str_contains($inboxView, "name=\"action\" value=\"delete\"")
         );
@@ -443,10 +440,11 @@ try {
             && str_contains($inboxView, 'The notification was deleted. Related church records were not changed.')
         );
         verify(
-            'Unread items only show Mark read, not Delete',
+            'Every notification shows a Delete button, including unread items',
             is_string($inboxView)
             && str_contains($inboxView, 'Mark read')
-            && preg_match('/if \(\$isUnread\):.*?Mark read.*?else:.*?action" value="delete"/s', $inboxView) === 1
+            && str_contains($inboxView, 'Delete this notification?')
+            && preg_match('/if \(\$isUnread\):.*?Mark read.*?endif;.*?action" value="delete"/s', $inboxView) === 1
         );
     }
 } catch (Throwable $exception) {

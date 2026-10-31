@@ -9,7 +9,9 @@ require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR', 'COUNSELOR', 'MI
 $notificationInbox = notification_inbox_prepare((int) current_user_id());
 $notificationLead = 'Alerts about registrations, requests, and assignments.';
 $pageTitle = 'Notifications';
-$activeNav = has_role('STAFF') && !has_role(['SUPER_ADMIN', 'CHURCH_ADMIN']) ? 'staff-notifications' : 'admin-notifications';
+$activeNav = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN'])
+    ? 'admin-notifications'
+    : (has_role('STAFF') ? 'staff-notifications' : 'role-notifications');
 $breadcrumbItems = [['label' => 'Notifications', 'url' => 'notifications.php']];
 
 require __DIR__ . '/../../includes/header.php';

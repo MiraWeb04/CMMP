@@ -111,6 +111,7 @@ return [
             ['key' => 'ministry-members', 'label' => 'Ministry Members', 'icon' => 'fa-users', 'url' => APP_BASE_URL . '/ministry/members/', 'roles' => ['MINISTRY_LEADER']],
             ['key' => 'ministry-activities', 'label' => 'Activities', 'icon' => 'fa-list-check', 'url' => APP_BASE_URL . '/ministry/activities/', 'roles' => ['MINISTRY_LEADER']],
             ['key' => 'ministry-events', 'label' => 'Events', 'icon' => 'fa-calendar-days', 'url' => APP_BASE_URL . '/ministry/events/', 'roles' => ['MINISTRY_LEADER']],
+            ['key' => 'role-notifications', 'label' => 'Notifications', 'icon' => 'fa-bell', 'url' => APP_BASE_URL . '/admin/staff/notifications.php', 'roles' => ['PASTOR', 'COUNSELOR', 'MINISTRY_LEADER']],
         ],
     ],
 ];

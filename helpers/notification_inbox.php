@@ -68,7 +68,7 @@ function notification_inbox_prepare(int $userId): array
             Notification::markAllRead($userId);
         } elseif ($action === 'delete') {
             try {
-                Notification::deleteReadForUser((int) ($_POST['id'] ?? 0), $userId);
+                Notification::deleteForUser((int) ($_POST['id'] ?? 0), $userId);
                 $notice = 'deleted';
             } catch (InvalidArgumentException $exception) {
                 $noticeError = $exception->getMessage();
