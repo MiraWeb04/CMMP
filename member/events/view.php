@@ -6,7 +6,7 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/event.php';
 
 require_role('MEMBER');
-$memberId = member_id_for_user((int) current_user_id());
+$memberId = member_id_for_user((int) current_user_id()) ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) { http_response_code(404); exit('Your member profile has not been created yet.'); }
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $event = $id ? Event::find($id, $memberId) : null;

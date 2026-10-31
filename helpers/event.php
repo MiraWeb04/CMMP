@@ -2,7 +2,9 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../models/Event.php';
+require_once __DIR__ . '/../models/Personnel.php';
 
 const EVENT_STATUSES = ['DRAFT', 'PUBLISHED', 'CANCELLED', 'COMPLETED'];
 
@@ -19,6 +21,7 @@ function event_input(array $source, bool $creating): array
     $data['capacity'] = $capacity === '' ? null : (int) $capacity;
     $data['registration_required'] = isset($source['registration_required']) ? 1 : 0;
     $data['event_status'] = (string) ($source['event_status'] ?? 'DRAFT');
+    $data['pastor_staff_id'] = filter_var($source['pastor_staff_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
 
     return $data;
 }
@@ -49,8 +52,32 @@ function validate_event_data(array $data): array
     if ($data['registration_required'] && empty($data['registration_deadline'])) {
         $errors[] = 'Registration deadline is required when registration is enabled.';
     }
+    if (empty($data['pastor_staff_id'])) {
+        $errors[] = 'Assign a pastor to this event.';
+    } elseif (!event_pastor_is_valid((int) $data['pastor_staff_id'])) {
+        $errors[] = 'Select an active pastor for this event.';
+    }
 
     return $errors;
+}
+
+function event_pastor_is_valid(int $staffId): bool
+{
+    foreach (Personnel::list('PASTOR') as $pastor) {
+        if ((int) ($pastor['id'] ?? 0) === $staffId && ($pastor['employment_status'] ?? '') === 'ACTIVE') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function event_pastors(): array
+{
+    return array_values(array_filter(
+        Personnel::list('PASTOR'),
+        static fn (array $pastor): bool => ($pastor['employment_status'] ?? '') === 'ACTIVE'
+    ));
 }
 
 function event_image_url(?string $path): ?string
@@ -90,13 +117,4 @@ function upload_event_image(?array $file): ?string
     }
 
     return 'uploads/event-images/' . $filename;
-}
-
-function member_id_for_user(int $userId): ?int
-{
-    $query = database()->prepare('SELECT id FROM members WHERE user_id = :user_id LIMIT 1');
-    $query->execute(['user_id' => $userId]);
-    $memberId = $query->fetchColumn();
-
-    return $memberId === false ? null : (int) $memberId;
 }

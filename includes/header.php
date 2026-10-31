@@ -3,15 +3,20 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/http.php';
+
+send_security_headers();
 
 $pageTitle = $pageTitle ?? APP_TITLE;
 $pageDescription = $pageDescription ?? '';
 $currentUser = $currentUser ?? authenticated_user();
 $currentRoles = $currentRoles ?? current_user_roles();
 
-function e(?string $value): string
-{
-	return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+if (!function_exists('e')) {
+	function e(?string $value): string
+	{
+		return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+	}
 }
 ?>
 <!doctype html>
@@ -21,6 +26,7 @@ function e(?string $value): string
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="<?= e($pageDescription ?: APP_TITLE) ?>">
 	<title><?= e($pageTitle) ?> | <?= e(APP_NAME) ?></title>
+	<link rel="icon" type="image/png" href="<?= e(APP_BASE_URL) ?>/assets/images/uccp-logo.png">
 	<link rel="preconnect" href="https://cdn.jsdelivr.net">
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

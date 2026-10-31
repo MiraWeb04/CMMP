@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
 
         if ($user === null) {
             $errors[] = 'Invalid login credentials.';
+        } elseif (($user['status'] ?? '') === 'LOCKED_TEMPORARY') {
+            $errors[] = 'Too many failed sign-in attempts. Wait 15 minutes and try again, or use Forgot password.';
         } elseif (($user['status'] ?? '') === 'PENDING') {
             $errors[] = 'Your registration is waiting for a church administrator to approve it.';
         } elseif (($user['status'] ?? 'INACTIVE') !== 'ACTIVE') {
@@ -43,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
                 $update = database()->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
                 $update->execute(['id' => (int) $user['id']]);
 
-                header('Location: ' . APP_BASE_URL . '/member-portal.php');
+                header('Location: ' . APP_BASE_URL . role_redirect_path($roles));
                 exit;
             }
         }
@@ -53,9 +55,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
 $currentUser = authenticated_user();
 $loggedIn = $currentUser !== null;
 
-function e(?string $value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+if (!function_exists('e')) {
+    function e(?string $value): string
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
 }
 
 $events = array_slice(Event::upcoming(0), 0, 3);
@@ -116,8 +120,8 @@ $spotlight = $announcements[0] ?? null;
     <header class="church-hero">
         <nav class="church-nav">
             <a class="church-brand" href="<?= e(APP_BASE_URL) ?>/member-portal.php">
-                <span class="church-brand-mark"><i class="fa-solid fa-church"></i></span>
-                <span><strong>CMMP</strong><small>Church portal</small></span>
+                <img class="church-brand-mark cmmp-brand-logo" src="<?= e(APP_BASE_URL) ?>/assets/images/uccp-logo.png" alt="UCCP logo" width="44" height="44" decoding="async">
+                <span><strong>CMMP</strong><small>UCCP Church portal</small></span>
             </a>
             <ul class="church-menu">
                 <li><a class="is-current" href="<?= e(APP_BASE_URL) ?>/member-portal.php">Home</a></li>

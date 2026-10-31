@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/../helpers/schema_guard.php';
+
+cmmp_load_environment();
+
 function database(): PDO
 {
     static $connection;
@@ -22,16 +27,27 @@ function database(): PDO
         $name
     );
 
-    try {
-        $connection = new PDO($dsn, $user, $password, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
-    } catch (PDOException $exception) {
-        error_log('CMMP database connection failed: ' . $exception->getMessage());
-        throw new RuntimeException('The CMMP database is temporarily unavailable.');
+    $attempts = 0;
+    $lastException = null;
+    while ($attempts < 3) {
+        $attempts++;
+        try {
+            $connection = new PDO($dsn, $user, $password, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 5,
+            ]);
+            cmmp_ensure_schema($connection);
+            return $connection;
+        } catch (PDOException $exception) {
+            $lastException = $exception;
+            error_log('CMMP database connection failed (attempt ' . $attempts . '): ' . $exception->getMessage());
+            if ($attempts < 3) {
+                usleep(150000 * $attempts);
+            }
+        }
     }
 
-    return $connection;
+    throw new RuntimeException('The CMMP database is temporarily unavailable.', 0, $lastException);
 }

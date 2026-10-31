@@ -12,6 +12,8 @@ $dashboardActions = $dashboardActions ?? [];
 $dashboardRecentTitle = $dashboardRecentTitle ?? '';
 $dashboardRecentItems = $dashboardRecentItems ?? [];
 $dashboardRecentEmpty = $dashboardRecentEmpty ?? 'Nothing to show yet.';
+$dashboardNotice = $dashboardNotice ?? '';
+$dashboardNoticeClass = $dashboardNoticeClass ?? 'alert-success';
 $activeNav = $activeNav ?? 'dashboard';
 $pageTitle = $pageTitle ?? $dashboardTitle;
 $breadcrumbItems = [['label' => $dashboardTitle, 'url' => APP_BASE_URL . role_redirect_path(current_user_roles())]];
@@ -31,6 +33,9 @@ require __DIR__ . '/breadcrumb.php';
     <p>Here is the church workspace that needs your attention.</p>
     <span class="cmmp-role-badge"><?= e($dashboardRoleLabel) ?></span>
 </section>
+<?php if ($dashboardNotice !== ''): ?>
+    <div class="alert <?= e($dashboardNoticeClass) ?>"><?= e($dashboardNotice) ?></div>
+<?php endif; ?>
 <?php if ($dashboardMetrics !== []): ?>
 <div class="row g-3 mb-1">
     <?php foreach ($dashboardMetrics as $metric): ?>
@@ -72,14 +77,19 @@ require __DIR__ . '/breadcrumb.php';
     <?php else: ?>
         <div class="cmmp-recent-list">
         <?php foreach ($dashboardRecentItems as $item): ?>
-            <article class="cmmp-recent-item">
-                <?php if (!empty($item['url'])): ?>
-                    <a href="<?= e($item['url']) ?>"><?= e($item['title']) ?></a>
-                <?php else: ?>
-                    <strong><?= e($item['title']) ?></strong>
-                <?php endif; ?>
-                <?php if (!empty($item['meta'])): ?>
-                    <small><?= e($item['meta']) ?></small>
+            <article class="cmmp-recent-item<?= !empty($item['action_html']) ? ' cmmp-recent-item-with-action' : '' ?>">
+                <div class="cmmp-recent-item-body">
+                    <?php if (!empty($item['url'])): ?>
+                        <a href="<?= e($item['url']) ?>"><?= e($item['title']) ?></a>
+                    <?php else: ?>
+                        <strong><?= e($item['title']) ?></strong>
+                    <?php endif; ?>
+                    <?php if (!empty($item['meta'])): ?>
+                        <small><?= e($item['meta']) ?></small>
+                    <?php endif; ?>
+                </div>
+                <?php if (!empty($item['action_html'])): ?>
+                    <div class="cmmp-recent-item-action"><?= $item['action_html'] ?></div>
                 <?php endif; ?>
             </article>
         <?php endforeach; ?>

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/AuditLog.php';
 
 final class Member
@@ -26,8 +27,13 @@ final class Member
         $parameters = [];
 
         if ($filters['search'] !== '') {
-            $conditions[] = '(m.member_number LIKE :search OR m.first_name LIKE :search OR m.middle_name LIKE :search OR m.last_name LIKE :search OR m.email LIKE :search)';
-            $parameters['search'] = '%' . $filters['search'] . '%';
+            $term = '%' . $filters['search'] . '%';
+            $conditions[] = '(m.member_number LIKE :search_number OR m.first_name LIKE :search_first OR m.middle_name LIKE :search_middle OR m.last_name LIKE :search_last OR m.email LIKE :search_email)';
+            $parameters['search_number'] = $term;
+            $parameters['search_first'] = $term;
+            $parameters['search_middle'] = $term;
+            $parameters['search_last'] = $term;
+            $parameters['search_email'] = $term;
         }
         if ($filters['status'] !== '') {
             $conditions[] = 'm.membership_status = :status';
@@ -104,20 +110,20 @@ final class Member
         return $memberId === false ? null : self::find((int) $memberId);
     }
 
-    public static function createFromRegistration(int $userId, string $firstName, string $lastName, ?string $email = null): int
+    public static function createFromRegistration(int $userId, array $profile): int
     {
         $memberNumber = 'CMMP-' . strtoupper(bin2hex(random_bytes(5)));
         $member = [
             'user_id' => $userId,
             'member_number' => $memberNumber,
-            'first_name' => $firstName ?: 'Member',
+            'first_name' => trim((string) ($profile['first_name'] ?? '')) ?: 'Member',
             'middle_name' => null,
-            'last_name' => $lastName ?: 'User',
+            'last_name' => trim((string) ($profile['last_name'] ?? '')) ?: 'User',
             'suffix' => null,
-            'date_of_birth' => null,
-            'gender' => null,
+            'date_of_birth' => trim((string) ($profile['date_of_birth'] ?? '')) ?: null,
+            'gender' => trim((string) ($profile['gender'] ?? '')) ?: null,
             'phone' => null,
-            'email' => $email,
+            'email' => trim((string) ($profile['email'] ?? '')) ?: null,
             'address_line_1' => null,
             'address_line_2' => null,
             'city' => null,
@@ -156,7 +162,27 @@ final class Member
         );
         $query->execute($data);
 
-        return (int) database()->lastInsertId();
+        $memberId = (int) database()->lastInsertId();
+        $linkedUserId = filter_var($data['user_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($linkedUserId) {
+            $role = database()->prepare('SELECT id FROM roles WHERE code = :code LIMIT 1');
+            $role->execute(['code' => 'MEMBER']);
+            $roleId = $role->fetchColumn();
+            if ($roleId !== false) {
+                database()->prepare(
+                    'INSERT IGNORE INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)'
+                )->execute(['user_id' => $linkedUserId, 'role_id' => (int) $roleId]);
+            }
+        }
+        if (($data['membership_status'] ?? 'ACTIVE') === 'ACTIVE') {
+            fellowship_sync_member(
+                $memberId,
+                $data['date_of_birth'] ?? null,
+                $data['gender'] ?? null
+            );
+        }
+
+        return $memberId;
     }
 
     public static function update(int $id, array $data): void
@@ -180,6 +206,12 @@ final class Member
         $data['id'] = $id;
         $query = database()->prepare('UPDATE members SET ' . implode(', ', $assignments) . ' WHERE id = :id');
         $query->execute($data);
+
+        $profile = self::find($id);
+        if ($profile) {
+            fellowship_sync_member($id, $profile['date_of_birth'] ?? null, $profile['gender'] ?? null);
+        }
+
         AuditLog::record(null, 'MEMBER_UPDATED', 'MEMBER', $id);
     }
 

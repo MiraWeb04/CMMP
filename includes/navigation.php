@@ -53,7 +53,7 @@ return [
         [
             'label' => 'Account',
             'items' => [
-                ['key' => 'staff-profile', 'label' => 'My Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/admin/staff/profile.php', 'roles' => ['STAFF']],
+                ['key' => 'account-profile', 'label' => 'My Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php', 'roles' => ['STAFF']],
                 ['key' => 'logout', 'label' => 'Logout', 'icon' => 'fa-right-from-bracket', 'url' => APP_BASE_URL . '/auth/logout.php', 'roles' => ['STAFF']],
             ],
         ],
@@ -95,12 +95,13 @@ return [
             ['key' => 'reports', 'label' => 'Reports', 'icon' => 'fa-chart-column', 'url' => APP_BASE_URL . '/admin/reports/', 'roles' => $administrators],
             ['key' => 'users', 'label' => 'Users & Roles', 'icon' => 'fa-user-shield', 'url' => APP_BASE_URL . '/admin/users/', 'roles' => $administrators],
             ['key' => 'admin-notifications', 'label' => 'Notifications', 'icon' => 'fa-bell', 'url' => APP_BASE_URL . '/admin/staff/notifications.php', 'roles' => $administrators],
+            ['key' => 'account-profile', 'label' => 'My Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php', 'roles' => $administrators],
         ],
     ],
     [
         'label' => 'Ministry & Care',
         'items' => [
-            ['key' => 'pastor-review', 'label' => 'Review Requests', 'icon' => 'fa-clipboard-check', 'url' => APP_BASE_URL . '/admin/services/', 'roles' => ['PASTOR']],
+            ['key' => 'pastor-review', 'label' => 'My Assignments', 'icon' => 'fa-clipboard-check', 'url' => APP_BASE_URL . '/pastor/services/', 'roles' => ['PASTOR']],
             ['key' => 'pastor-calendar', 'label' => 'Church Calendar', 'icon' => 'fa-calendar-check', 'url' => APP_BASE_URL . '/admin/services/calendar.php', 'roles' => ['PASTOR']],
             ['key' => 'pastor-services', 'label' => 'My Services', 'icon' => 'fa-hands-praying', 'url' => APP_BASE_URL . '/pastor/services/', 'roles' => ['PASTOR']],
             ['key' => 'pastor-appointments', 'label' => 'Appointments', 'icon' => 'fa-calendar-check', 'url' => APP_BASE_URL . '/pastor/appointments/', 'roles' => ['PASTOR']],
@@ -111,6 +112,8 @@ return [
             ['key' => 'ministry-members', 'label' => 'Ministry Members', 'icon' => 'fa-users', 'url' => APP_BASE_URL . '/ministry/members/', 'roles' => ['MINISTRY_LEADER']],
             ['key' => 'ministry-activities', 'label' => 'Activities', 'icon' => 'fa-list-check', 'url' => APP_BASE_URL . '/ministry/activities/', 'roles' => ['MINISTRY_LEADER']],
             ['key' => 'ministry-events', 'label' => 'Events', 'icon' => 'fa-calendar-days', 'url' => APP_BASE_URL . '/ministry/events/', 'roles' => ['MINISTRY_LEADER']],
+            ['key' => 'role-notifications', 'label' => 'Notifications', 'icon' => 'fa-bell', 'url' => APP_BASE_URL . '/admin/staff/notifications.php', 'roles' => ['PASTOR', 'COUNSELOR', 'MINISTRY_LEADER']],
+            ['key' => 'account-profile', 'label' => 'My Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php', 'roles' => ['PASTOR', 'COUNSELOR', 'MINISTRY_LEADER']],
         ],
     ],
 ];

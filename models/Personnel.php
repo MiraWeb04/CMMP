@@ -209,6 +209,11 @@ final class Personnel
 
     public static function list(string $type = 'STAFF'): array
     {
+        return self::paginate($type, 1, 500)['items'];
+    }
+
+    public static function paginate(string $type, int $page, int $perPage): array
+    {
         $typeFilter = '';
         $where = "s.employment_status = 'ACTIVE'";
 
@@ -220,19 +225,22 @@ final class Personnel
             $typeFilter = ' AND p.id IS NULL AND c.id IS NULL';
         }
 
+        $from = ' FROM staff s
+             LEFT JOIN members m ON m.id = s.member_id
+             LEFT JOIN users u ON u.id = COALESCE(s.user_id, m.user_id)
+             LEFT JOIN pastors p ON p.staff_id = s.id
+             LEFT JOIN counselors c ON c.staff_id = s.id
+             WHERE ' . $where . $typeFilter;
+        $total = (int) database()->query('SELECT COUNT(*)' . $from)->fetchColumn();
+        $offset = ($page - 1) * $perPage;
         $query = database()->query(
                 'SELECT s.id, s.employee_number, s.position_title, s.employment_status, s.hired_at,
                     p.ordination_date, c.specialization, c.credentials, u.email,
                     COALESCE(CONCAT(m.first_name, " ", m.last_name), u.username, s.employee_number) AS display_name,
                     CASE WHEN p.id IS NOT NULL THEN "PASTOR" WHEN c.id IS NOT NULL THEN "COUNSELOR" ELSE "STAFF" END AS personnel_type
-             FROM staff s
-             LEFT JOIN members m ON m.id = s.member_id
-             LEFT JOIN users u ON u.id = COALESCE(s.user_id, m.user_id)
-             LEFT JOIN pastors p ON p.staff_id = s.id
-             LEFT JOIN counselors c ON c.staff_id = s.id
-             WHERE ' . $where . $typeFilter . ' ORDER BY display_name'
+             ' . $from . ' ORDER BY display_name LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset
         );
-        return $query->fetchAll();
+        return ['items' => $query->fetchAll(), 'total' => $total];
     }
 
     public static function findForUser(int $userId): ?array

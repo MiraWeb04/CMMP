@@ -9,17 +9,26 @@ require_once __DIR__ . '/../../models/Announcement.php';
 require_once __DIR__ . '/../../models/Notification.php';
 require_role('MEMBER');
 
-$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) {
     http_response_code(404);
     exit('Your member profile has not been created yet.');
 }
 
-$requests = ServiceRequest::paginateForMember($memberId);
+try {
+    $requests = ServiceRequest::paginateForMember($memberId);
+    $events = Event::upcoming($memberId);
+    $announcements = Announcement::listForUser(current_user_roles());
+    $unread = Notification::unreadCount((int) current_user_id());
+} catch (Throwable $exception) {
+    error_log('CMMP member dashboard data failed: ' . $exception->getMessage());
+    $requests = [];
+    $events = [];
+    $announcements = [];
+    $unread = 0;
+}
 $openRequests = array_values(array_filter($requests, static fn(array $item): bool => !in_array($item['status'], ['COMPLETED', 'REJECTED', 'CANCELLED'], true)));
-$events = Event::upcoming($memberId);
-$announcements = Announcement::listForUser(current_user_roles());
-$unread = Notification::unreadCount((int) current_user_id());
 
 $dashboardTitle = 'Member dashboard';
 $dashboardLead = 'Check the church calendar, send a service or facility request, and follow your request status.';
@@ -45,11 +54,30 @@ $dashboardRecentTitle = 'Recent requests';
 $dashboardRecentEmpty = 'You have not submitted a service or facility request yet.';
 $dashboardRecentItems = [];
 foreach (array_slice($requests, 0, 6) as $request) {
+    $actionHtml = '';
+    if (ServiceRequest::memberCanHide($request, $memberId)) {
+        ob_start();
+        $hideRequestId = (int) $request['id'];
+        $hideReturnTo = 'dashboard';
+        $hideButtonLabel = 'Delete';
+        require __DIR__ . '/../../includes/member-hide-request-form.php';
+        $actionHtml = (string) ob_get_clean();
+    }
     $dashboardRecentItems[] = [
         'title' => $request['request_number'] . ' · ' . $request['service_name'],
         'meta' => service_status_label((string) $request['status']) . ' · ' . $request['requested_at'],
         'url' => APP_BASE_URL . '/member/services/view.php?id=' . (int) $request['id'],
+        'action_html' => $actionHtml,
     ];
+}
+
+$dashboardNotice = '';
+$dashboardNoticeClass = 'alert-success';
+if (isset($_GET['hidden'])) {
+    $dashboardNotice = 'The completed request was deleted from your list. Church staff still have the original record.';
+} elseif (!empty($_GET['hide_error'])) {
+    $dashboardNotice = (string) $_GET['hide_error'];
+    $dashboardNoticeClass = 'alert-danger';
 }
 
 require __DIR__ . '/../../includes/role-dashboard.php';

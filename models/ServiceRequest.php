@@ -74,7 +74,8 @@ final class ServiceRequest
                 filter_var($data['preferred_facility_id'] ?? null, FILTER_VALIDATE_INT) ?: null,
                 null,
                 null,
-                $serviceCode
+                $serviceCode,
+                false
             );
             if (trim((string) ($data['request_number'] ?? '')) === '') {
                 $data['request_number'] = self::nextRequestNumber($connection);
@@ -173,40 +174,159 @@ final class ServiceRequest
     {
         $query = database()->prepare(
             'SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
-                    st.name AS service_name
+                    sr.requested_by_member_id, sr.preferred_start_datetime, sr.preferred_end_datetime,
+                    sr.completed_at, sr.hidden_from_member_at, st.name AS service_name
              FROM service_requests sr
              INNER JOIN service_types st ON st.id = sr.service_type_id
              WHERE sr.requested_by_member_id = :member_id
+               AND sr.hidden_from_member_at IS NULL
              ORDER BY sr.created_at DESC'
         );
         $query->execute(['member_id' => $memberId]);
         return $query->fetchAll();
     }
 
-    public static function paginateForAdmin(string $search, string $status): array
+    public static function memberCanHide(array $request, int $memberId): bool
+    {
+        $ownerId = (int) ($request['requested_by_member_id'] ?? 0);
+        if ($ownerId > 0 && $ownerId !== $memberId) {
+            return false;
+        }
+        if (!empty($request['hidden_from_member_at'])) {
+            return false;
+        }
+
+        return ($request['status'] ?? '') === 'COMPLETED';
+    }
+
+    public static function hideFromMember(int $requestId, int $memberId, ?int $userId = null): void
+    {
+        $query = database()->prepare(
+            'SELECT id, requested_by_member_id, status, preferred_start_datetime,
+                    preferred_end_datetime, completed_at, hidden_from_member_at
+             FROM service_requests
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $query->execute(['id' => $requestId]);
+        $request = $query->fetch();
+        if (!$request) {
+            throw new InvalidArgumentException('Service request not found.');
+        }
+        if (!self::memberCanHide($request, $memberId)) {
+            throw new InvalidArgumentException(
+                'Only your own completed requests can be deleted from your list.'
+            );
+        }
+
+        $update = database()->prepare(
+            'UPDATE service_requests
+             SET hidden_from_member_at = NOW()
+             WHERE id = :id
+               AND requested_by_member_id = :member_id
+               AND status = "COMPLETED"
+               AND hidden_from_member_at IS NULL'
+        );
+        $update->execute(['id' => $requestId, 'member_id' => $memberId]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('The request could not be deleted from your list.');
+        }
+
+        if ($userId) {
+            AuditLog::record($userId, 'SERVICE_REQUEST_HIDDEN_BY_MEMBER', 'SERVICE_REQUEST', $requestId);
+        }
+    }
+
+    public static function paginateForAdmin(string $search, string $status, int $page = 0, int $perPage = 15): array
     {
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(sr.request_number LIKE :search OR sr.subject LIKE :search OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(sr.request_number LIKE :search_number OR sr.subject LIKE :search_subject OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search_name)';
+            $parameters['search_number'] = $term;
+            $parameters['search_subject'] = $term;
+            $parameters['search_name'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'sr.status = :status';
             $parameters['status'] = $status;
         }
         $where = $conditions === [] ? '' : 'WHERE ' . implode(' AND ', $conditions);
-        $query = database()->prepare(
-            "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
+        $select = "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
                     COALESCE(st.name, 'Unknown Service') AS service_name,
                     COALESCE(CONCAT(m.first_name, ' ', m.last_name), 'Unknown Member') AS member_name
              FROM service_requests sr
              LEFT JOIN service_types st ON st.id = sr.service_type_id
              LEFT JOIN members m ON m.id = sr.requested_by_member_id
-             $where ORDER BY sr.created_at DESC"
+             $where ORDER BY sr.created_at DESC";
+
+        if ($page < 1) {
+            $query = database()->prepare($select);
+            $query->execute($parameters);
+            return $query->fetchAll();
+        }
+
+        $count = database()->prepare(
+            "SELECT COUNT(*) FROM service_requests sr
+             LEFT JOIN members m ON m.id = sr.requested_by_member_id
+             $where"
+        );
+        $count->execute($parameters);
+        $total = (int) $count->fetchColumn();
+
+        $query = database()->prepare($select . ' LIMIT :limit OFFSET :offset');
+        foreach ($parameters as $key => $value) {
+            $query->bindValue(':' . $key, $value, PDO::PARAM_STR);
+        }
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
+        $query->execute();
+
+        return ['items' => $query->fetchAll(), 'total' => $total];
+    }
+
+    public static function paginateForAssignedStaff(int $staffId, string $search = '', string $status = ''): array
+    {
+        $conditions = ['sa.staff_id = :staff_id'];
+        $parameters = ['staff_id' => $staffId];
+        if ($search !== '') {
+            $term = '%' . $search . '%';
+            $conditions[] = '(sr.request_number LIKE :search_number OR sr.subject LIKE :search_subject OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search_name)';
+            $parameters['search_number'] = $term;
+            $parameters['search_subject'] = $term;
+            $parameters['search_name'] = $term;
+        }
+        if ($status !== '') {
+            $conditions[] = 'sr.status = :status';
+            $parameters['status'] = $status;
+        }
+        $where = 'WHERE ' . implode(' AND ', $conditions);
+        $query = database()->prepare(
+            "SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
+                    COALESCE(st.name, 'Unknown Service') AS service_name,
+                    COALESCE(CONCAT(m.first_name, ' ', m.last_name), 'Unknown Member') AS member_name,
+                    sa.assignment_role
+             FROM service_assignments sa
+             INNER JOIN service_requests sr ON sr.id = sa.service_request_id
+             LEFT JOIN service_types st ON st.id = sr.service_type_id
+             LEFT JOIN members m ON m.id = sr.requested_by_member_id
+             $where
+             ORDER BY sr.created_at DESC"
         );
         $query->execute($parameters);
+
         return $query->fetchAll();
+    }
+
+    public static function isAssignedToStaff(int $requestId, int $staffId): bool
+    {
+        $query = database()->prepare(
+            'SELECT 1 FROM service_assignments WHERE service_request_id = :request_id AND staff_id = :staff_id LIMIT 1'
+        );
+        $query->execute(['request_id' => $requestId, 'staff_id' => $staffId]);
+
+        return (bool) $query->fetchColumn();
     }
 
     public static function find(int $id): ?array
@@ -411,9 +531,8 @@ final class ServiceRequest
         );
         $assignment->execute(['request_id' => $requestId, 'staff_id' => $staffId]);
         $assignedToPastor = (bool) $assignment->fetchColumn();
-        $openForReview = in_array($status, ['PENDING', 'PENDING_ASSIGNMENT', 'UNDER_REVIEW', 'DOCUMENTS_REQUIRED', 'RESCHEDULE_REQUIRED'], true);
-        if (!$assignedToPastor && !$openForReview) {
-            throw new InvalidArgumentException('This request is not waiting for your decision.');
+        if (!$assignedToPastor) {
+            throw new InvalidArgumentException('This request is not assigned to you.');
         }
 
         if ($decision === 'approve') {

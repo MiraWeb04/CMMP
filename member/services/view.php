@@ -5,10 +5,11 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/Counseling.php';
 require_role('MEMBER');
-$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $request = $id ? ServiceRequest::find($id) : null;
-if (!$request || (int) $request['requested_by_member_id'] !== $memberId) {
+if (!$request || (int) $request['requested_by_member_id'] !== $memberId || !empty($request['hidden_from_member_at'])) {
     http_response_code(404);
     exit('Service request not found.');
 }
@@ -35,7 +36,18 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         <h1><?= e($request['service_name']) ?></h1>
         <p>Booking Reference: <?= e($request['request_number']) ?></p>
     </div>
-    <a class="btn btn-outline-secondary" href="index.php">Back</a>
+    <div class="d-flex flex-wrap gap-2">
+        <?php if (ServiceRequest::memberCanHide($request, $memberId)): ?>
+            <?php
+            $hideRequestId = (int) $request['id'];
+            $hideReturnTo = 'services';
+            $hideButtonClass = 'btn btn-outline-danger';
+            $hideButtonLabel = 'Delete';
+            require __DIR__ . '/../../includes/member-hide-request-form.php';
+            ?>
+        <?php endif; ?>
+        <a class="btn btn-outline-secondary" href="index.php">Back</a>
+    </div>
 </div>
 
 <div class="alert <?= $isPendingAssignment ? 'alert-info' : 'alert-light' ?> border">

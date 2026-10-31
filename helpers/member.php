@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../models/Member.php';
+require_once __DIR__ . '/fellowship.php';
 
 const MEMBER_STATUSES = ['ACTIVE', 'INACTIVE', 'TRANSFERRED', 'DECEASED'];
 const MEMBER_PROFILE_FIELDS = [
@@ -55,6 +56,8 @@ function validate_member_data(array $data, bool $creating, bool $admin): array
     if ($admin && !in_array($data['membership_status'] ?? 'ACTIVE', MEMBER_STATUSES, true)) {
         $errors[] = 'Select a valid membership status.';
     }
+
+    $errors = array_merge($errors, fellowship_validate_member_profile($data, $admin));
 
     return $errors;
 }

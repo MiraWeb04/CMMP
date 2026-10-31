@@ -5,10 +5,12 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/Member.php';
 require_once __DIR__ . '/../../models/Facility.php';
+require_once __DIR__ . '/../../models/ChurchCalendar.php';
 
 require_role('MEMBER');
 
-$memberId = ServiceRequest::memberIdForUser((int) current_user_id());
+$memberId = ServiceRequest::memberIdForUser((int) current_user_id())
+    ?? ensure_member_profile((int) current_user_id());
 if (!$memberId) {
     http_response_code(404);
     exit('Your member profile has not been created yet.');
@@ -59,6 +61,24 @@ foreach ($types as $type) {
 }
 
 $code = $selected['code'] ?? '';
+$probeTime = $preferredTime !== '' && preg_match('/^\d{2}:\d{2}/', $preferredTime) === 1
+    ? substr($preferredTime, 0, 5)
+    : null;
+$serviceApplicability = [];
+if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1) {
+    foreach ($types as $type) {
+        $typeCode = (string) $type['code'];
+        $serviceApplicability[$typeCode] = ChurchCalendar::serviceApplicableOnDate(
+            $typeCode,
+            $preferredDate,
+            service_facility_for_applicability($typeCode, $facilityId),
+            $probeTime
+        );
+    }
+}
+$selectedNotApplicable = $code !== ''
+    && $preferredDate !== ''
+    && ($serviceApplicability[$code] ?? true) === false;
 $counselingOffice = null;
 if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
     $counselingOffice = Facility::counselingOffice();
@@ -68,7 +88,7 @@ if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
 $durationHours = $code === 'FUNERAL_SERVICE' ? 2 : 1;
 if ($preferredDate !== '' && $preferredTime !== '') {
     $preferredStart = $preferredDate . 'T' . $preferredTime;
-    if ($code === 'FACILITY_RESERVATION' && $preferredEndTime !== '') {
+    if (in_array($code, ['FACILITY_RESERVATION', 'MANANITA'], true) && $preferredEndTime !== '') {
         $preferredEnd = $preferredDate . 'T' . $preferredEndTime;
     } else {
         $startTimestamp = strtotime($preferredStart);
@@ -85,6 +105,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_valid_csrf_token();
     if (!$selected) {
         $errors[] = 'Select a valid service type.';
+    } elseif (
+        $preferredDate !== ''
+        && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate) === 1
+        && !ChurchCalendar::serviceApplicableOnDate(
+            (string) $selected['code'],
+            $preferredDate,
+            service_facility_for_applicability((string) $selected['code'], $facilityId),
+            $probeTime
+        )
+    ) {
+        $errors[] = (string) $selected['name'] . ' is not available on the selected date because of a church event or activity on the schedule.';
     } else {
         $errors = validate_service_request($selected['code'], $data, $preferredStart, $preferredEnd, $facilityId);
     }
@@ -161,9 +192,20 @@ $field = static function (array $data, string $name): string {
             <select class="form-select" id="service_type_id" name="service_type_id" required onchange="this.form.submit()">
                 <option value="">Select service</option>
                 <?php foreach ($types as $type): ?>
-                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
+                    <?php
+                    $typeCode = (string) $type['code'];
+                    $applicable = $serviceApplicability === [] || ($serviceApplicability[$typeCode] ?? true);
+                    $optionLabel = (string) $type['name'];
+                    if (!$applicable) {
+                        $optionLabel .= ' (Unavailable on this date)';
+                    }
+                    ?>
+                    <option value="<?= (int) $type['id'] ?>" <?= $selectedType === (int) $type['id'] ? 'selected' : '' ?> <?= $applicable ? '' : 'disabled' ?>><?= e($optionLabel) ?></option>
                 <?php endforeach; ?>
             </select>
+            <?php if ($preferredDate !== ''): ?>
+                <div class="form-text">Date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. Services marked unavailable conflict with a church event or activity for that service type only. Other services may still be requested.</div>
+            <?php endif; ?>
         </div>
         <?php if ($preferredDate !== ''): ?>
             <div class="col-md-4">
@@ -174,7 +216,13 @@ $field = static function (array $data, string $name): string {
     </form>
 </div>
 
-<?php if ($selected): ?>
+<?php if ($selected && $selectedNotApplicable): ?>
+<div class="alert alert-warning">
+    <?= e($selected['name']) ?> is not available on <?= e(date('F j, Y', strtotime($preferredDate))) ?> due to a scheduling conflict with a church event or activity. Choose another date or select a different service that is still available.
+</div>
+<?php endif; ?>
+
+<?php if ($selected && !$selectedNotApplicable): ?>
 <div class="cmmp-card">
     <p class="text-muted"><?= e($selected['description'] ?? 'Complete the service information and your preferred schedule.') ?></p>
 
@@ -296,6 +344,24 @@ $field = static function (array $data, string $name): string {
                     </select>
                 </div>
                 <div class="col-md-12"><label class="form-label" for="funeral_location">Location details</label><input class="form-control" id="funeral_location" name="funeral_location" value="<?= $field($data, 'funeral_location') ?>"></div>
+            </div>
+        <?php elseif ($code === 'MANANITA'): ?>
+            <h2 class="h5 mt-2">Mañanita service</h2>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6"><label class="form-label" for="honoree_name">Birthday honoree</label><input class="form-control" id="honoree_name" name="honoree_name" value="<?= $field($data, 'honoree_name') ?>" required></div>
+                <div class="col-md-3"><label class="form-label" for="contact_number">Contact number</label><input class="form-control" id="contact_number" name="contact_number" value="<?= $field($data, 'contact_number') ?>" required></div>
+                <div class="col-md-3"><label class="form-label" for="contact_email">Email</label><input class="form-control" id="contact_email" name="contact_email" type="email" value="<?= $field($data, 'contact_email') ?>"></div>
+                <div class="col-md-6"><label class="form-label" for="preferred_facility_id">Facility</label>
+                    <select class="form-select" id="preferred_facility_id" name="preferred_facility_id" required>
+                        <option value="">Select a facility</option>
+                        <?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= $facilityId === (int) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name']) ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-6"><label class="form-label" for="event_purpose">Occasion details</label><input class="form-control" id="event_purpose" name="event_purpose" value="<?= $field($data, 'event_purpose') ?>" placeholder="e.g. 70th birthday mañanita"></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_date">Preferred date</label><input class="form-control" id="preferred_date" name="preferred_date" type="date" value="<?= e($preferredDate) ?>" required></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_time">Start time</label><input class="form-control" id="preferred_time" name="preferred_time" type="time" value="<?= e($preferredTime) ?>" required></div>
+                <div class="col-md-4"><label class="form-label" for="preferred_end_time">End time</label><input class="form-control" id="preferred_end_time" name="preferred_end_time" type="time" value="<?= e($preferredEndTime) ?>" required></div>
+                <div class="col-12"><label class="form-label" for="additional_information">Additional notes</label><textarea class="form-control" id="additional_information" name="additional_information" rows="3"><?= $field($data, 'additional_information') ?></textarea></div>
             </div>
         <?php elseif ($code === 'FACILITY_RESERVATION'): ?>
             <h2 class="h5 mt-2">Facility Reservation</h2>
