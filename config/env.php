@@ -22,9 +22,9 @@ function cmmp_load_environment(): void
     }
 
     $realPath = realpath($path);
-    $normalizedRoot = strtolower(str_replace('/', '\\', $root));
-    $normalizedPath = $realPath === false ? '' : strtolower(str_replace('/', '\\', $realPath));
-    if ($normalizedPath === '' || !str_starts_with($normalizedPath, $normalizedRoot . '\\')) {
+    $normalizedRoot = rtrim(strtolower(str_replace('\\', '/', $root)), '/');
+    $normalizedPath = $realPath === false ? '' : strtolower(str_replace('\\', '/', $realPath));
+    if ($normalizedPath === '' || !str_starts_with($normalizedPath, $normalizedRoot . '/')) {
         error_log('CMMP environment file was skipped.');
         return;
     }

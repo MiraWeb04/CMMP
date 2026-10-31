@@ -51,6 +51,16 @@ final class MailService
             };
             $mail->Timeout = 20;
             $mail->CharSet = PHPMailer::CHARSET_UTF8;
+            $cafile = (string) (ini_get('openssl.cafile') ?: ini_get('curl.cainfo') ?: '');
+            if ($cafile === '' || !is_file($cafile)) {
+                $mail->SMTPOptions = [
+                    'ssl' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false,
+                        'allow_self_signed' => true,
+                    ],
+                ];
+            }
             $mail->setFrom($config['from_address'], $config['from_name']);
             $mail->addAddress($toAddress);
             $mail->Subject = $subject;
