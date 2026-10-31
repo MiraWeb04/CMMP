@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/app.php';
+require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/../models/Event.php';
 require_once __DIR__ . '/../models/Personnel.php';
 
@@ -116,13 +117,4 @@ function upload_event_image(?array $file): ?string
     }
 
     return 'uploads/event-images/' . $filename;
-}
-
-function member_id_for_user(int $userId): ?int
-{
-    $query = database()->prepare('SELECT id FROM members WHERE user_id = :user_id LIMIT 1');
-    $query->execute(['user_id' => $userId]);
-    $memberId = $query->fetchColumn();
-
-    return $memberId === false ? null : (int) $memberId;
 }
