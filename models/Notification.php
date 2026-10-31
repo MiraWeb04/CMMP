@@ -23,8 +23,10 @@ final class Notification
         }
         $search = trim((string) ($filters['q'] ?? ''));
         if ($search !== '') {
-            $where[] = '(title LIKE :search OR message LIKE :search)';
-            $params['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $where[] = '(title LIKE :search_title OR message LIKE :search_message)';
+            $params['search_title'] = $term;
+            $params['search_message'] = $term;
         }
         $since = (string) ($filters['since'] ?? '');
         if ($since !== '') {
