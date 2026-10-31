@@ -27,7 +27,7 @@ function mail_config(): array
         'port' => $port,
         'encryption' => $encryption,
         'username' => (string) cmmp_env('MAIL_USERNAME', ''),
-        'password' => str_replace(' ', '', (string) cmmp_env('MAIL_PASSWORD', '')),
+        'password' => str_replace(' ', '', trim((string) cmmp_env('MAIL_PASSWORD', ''))),
         'from_address' => (string) cmmp_env('MAIL_FROM_ADDRESS', ''),
         'from_name' => cmmp_single_line((string) cmmp_env('MAIL_FROM_NAME', 'CMMP Church Portal'), 'CMMP Church Portal'),
     ];
