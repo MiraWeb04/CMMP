@@ -251,8 +251,11 @@ final class ServiceRequest
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(sr.request_number LIKE :search OR sr.subject LIKE :search OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(sr.request_number LIKE :search_number OR sr.subject LIKE :search_subject OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search_name)';
+            $parameters['search_number'] = $term;
+            $parameters['search_subject'] = $term;
+            $parameters['search_name'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'sr.status = :status';
