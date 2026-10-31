@@ -94,18 +94,17 @@ $unread = (int) $notificationInbox['unread'];
                         <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
                         <button class="btn btn-sm btn-outline-primary" type="submit">Mark read</button>
                     </form>
-                <?php else: ?>
-                    <form method="post" onsubmit="return confirm('Delete this read notification? Related service requests, appointments, and events will not be deleted.');">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
-                        <input type="hidden" name="q" value="<?= e($filters['q']) ?>">
-                        <input type="hidden" name="status" value="<?= e($filters['status']) ?>">
-                        <input type="hidden" name="type" value="<?= e($filters['type']) ?>">
-                        <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
-                        <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                    </form>
                 <?php endif; ?>
+                <form method="post" onsubmit="return confirm('Delete this notification? Related service requests, appointments, and events will not be deleted.');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" value="<?= (int) $item['id'] ?>">
+                    <input type="hidden" name="q" value="<?= e($filters['q']) ?>">
+                    <input type="hidden" name="status" value="<?= e($filters['status']) ?>">
+                    <input type="hidden" name="type" value="<?= e($filters['type']) ?>">
+                    <input type="hidden" name="period" value="<?= e($filters['period']) ?>">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
             </div>
         </article>
     <?php endforeach; ?>
