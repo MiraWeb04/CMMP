@@ -27,7 +27,7 @@ $destination = $returnTo === 'dashboard'
     : APP_BASE_URL . '/member/services/';
 
 if (!$requestId) {
-    header('Location: ' . $destination . '?hide_error=' . urlencode('Select a completed request to remove.'));
+    header('Location: ' . $destination . '?hide_error=' . urlencode('Select a completed request to delete.'));
     exit;
 }
 
@@ -40,6 +40,6 @@ try {
     exit;
 } catch (Throwable $exception) {
     error_log('CMMP member hide service request failed: ' . $exception->getMessage());
-    header('Location: ' . $destination . '?hide_error=' . urlencode('The request could not be removed from your dashboard.'));
+    header('Location: ' . $destination . '?hide_error=' . urlencode('The request could not be deleted from your list.'));
     exit;
 }

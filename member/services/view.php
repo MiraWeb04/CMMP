@@ -41,7 +41,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
             $hideRequestId = (int) $request['id'];
             $hideReturnTo = 'services';
             $hideButtonClass = 'btn btn-outline-danger';
-            $hideButtonLabel = 'Remove from dashboard';
+            $hideButtonLabel = 'Delete';
             require __DIR__ . '/../../includes/member-hide-request-form.php';
             ?>
         <?php endif; ?>

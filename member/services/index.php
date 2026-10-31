@@ -34,7 +34,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
     <div class="alert alert-success">Your request has been received. Church staff will review your requested schedule and assign the appropriate pastor/counselor.</div>
 <?php endif; ?>
 <?php if (isset($_GET['hidden'])): ?>
-    <div class="alert alert-success">The completed request was removed from your list. Church staff still have the original record.</div>
+    <div class="alert alert-success">The completed request was deleted from your list. Church staff still have the original record.</div>
 <?php endif; ?>
 <?php if (!empty($_GET['hide_error'])): ?>
     <div class="alert alert-danger"><?= e((string) $_GET['hide_error']) ?></div>

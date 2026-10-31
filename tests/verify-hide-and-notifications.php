@@ -224,12 +224,12 @@ try {
     $otherCompleted = $pdo->query('SELECT * FROM service_requests WHERE id = ' . $otherCompletedId)->fetch();
 
     verify(
-        'Owner can hide own completed request that already occurred',
+        'Owner can delete own completed request',
         ServiceRequest::memberCanHide($eligible, $memberId) === true
     );
     verify(
-        'Future completed request cannot be hidden yet',
-        ServiceRequest::memberCanHide($futureCompleted, $memberId) === false
+        'Completed request can be deleted even if the preferred date is in the future',
+        ServiceRequest::memberCanHide($futureCompleted, $memberId) === true
     );
     verify(
         'Pending request cannot be hidden',
@@ -265,11 +265,9 @@ try {
     );
     verify('hideFromMember rejects another member\'s request', $blockedOther, $otherMessage);
 
-    [$blockedFuture, $futureMessage] = expectException(
-        static fn () => ServiceRequest::hideFromMember($futureCompletedId, $memberId, $memberUserId),
-        'Only your own completed requests'
-    );
-    verify('hideFromMember rejects a completed request that has not occurred', $blockedFuture, $futureMessage);
+    ServiceRequest::hideFromMember($futureCompletedId, $memberId, $memberUserId);
+    $futureHidden = $pdo->query('SELECT hidden_from_member_at FROM service_requests WHERE id = ' . $futureCompletedId)->fetchColumn();
+    verify('Completed request with a future preferred date can be deleted from the member list', $futureHidden !== null);
 
     ServiceRequest::hideFromMember($eligibleId, $memberId, $memberUserId);
     $hiddenRow = $pdo->query('SELECT * FROM service_requests WHERE id = ' . $eligibleId)->fetch();
@@ -335,7 +333,7 @@ try {
     verify(
         'Member hide confirmation dialog is present',
         is_string($hideForm)
-        && str_contains($hideForm, 'Remove this completed request from your dashboard?')
+        && str_contains($hideForm, 'Delete this completed request from your list?')
         && str_contains($hideForm, 'onsubmit="return confirm(')
     );
     $hideEndpoint = file_get_contents(__DIR__ . '/../member/services/hide.php');
