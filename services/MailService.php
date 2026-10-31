@@ -65,8 +65,8 @@ final class MailService
             }
 
             $mail->send();
-        } catch (Throwable) {
-            error_log('CMMP email delivery failed.');
+        } catch (Throwable $exception) {
+            error_log('CMMP email delivery failed: ' . $exception->getMessage());
             throw new RuntimeException('Email delivery is temporarily unavailable.');
         } finally {
             if ($mail instanceof PHPMailer) {
@@ -75,6 +75,21 @@ final class MailService
                 $mail->clearAllRecipients();
                 $mail->smtpClose();
             }
+        }
+    }
+
+    public static function trySend(string $toAddress, string $subject, string $body, bool $html = false): bool
+    {
+        try {
+            if (!mail_is_configured()) {
+                error_log('CMMP email skipped because SMTP is not configured.');
+                return false;
+            }
+            self::send($toAddress, $subject, $body, $html);
+            return true;
+        } catch (Throwable $exception) {
+            error_log('CMMP email notification skipped: ' . $exception->getMessage());
+            return false;
         }
     }
 }

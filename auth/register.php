@@ -86,6 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				'date_of_birth' => $fields['date_of_birth'],
 				'gender' => $fields['gender'],
 			]);
+			Notification::create(
+				$userId,
+				'Registration received',
+				'Thank you for registering with the UCCP Church Management & Member Portal. A church administrator will review your account and notify you when you can sign in.',
+				'MEMBER_REGISTRATION_RECEIVED',
+				'user',
+				$userId
+			);
 			Notification::notifyAdministrators(
 				'New member registration',
 				$fields['first_name'] . ' ' . $fields['last_name'] . ' (' . $fields['email'] . ') is waiting for approval.',

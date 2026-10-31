@@ -51,6 +51,14 @@ if ($decision === 'approve') {
 $connection->prepare('UPDATE users SET status = "INACTIVE" WHERE id = :id AND status = "PENDING"')->execute(['id' => $userId]);
 $connection->prepare('UPDATE members SET membership_status = "INACTIVE" WHERE user_id = :id')->execute(['id' => $userId]);
 AuditLog::record((int) current_user_id(), 'MEMBER_REGISTRATION_DECLINED', 'USER', $userId);
+Notification::create(
+    $userId,
+    'Registration update',
+    'A church administrator was unable to approve your registration. Please contact the church office if you have questions.',
+    'MEMBER_REGISTRATION_DECLINED',
+    'user',
+    $userId
+);
 header('Location: ' . registration_decision_redirect('declined'));
 exit;
 

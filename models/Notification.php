@@ -1,9 +1,13 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../services/NotificationService.php';
 final class Notification
 {
-    public static function create(int $userId,string $title,string $message,string $type,?string $referenceType=null,?int $referenceId=null): void { database()->prepare('INSERT INTO notifications (user_id,title,message,notification_type,reference_type,reference_id) VALUES (:user_id,:title,:message,:type,:reference_type,:reference_id)')->execute(['user_id'=>$userId,'title'=>$title,'message'=>$message,'type'=>$type,'reference_type'=>$referenceType,'reference_id'=>$referenceId]); }
+    public static function create(int $userId,string $title,string $message,string $type,?string $referenceType=null,?int $referenceId=null): void
+    {
+        NotificationService::notifyUser($userId, $title, $message, $type ?: 'GENERIC', $referenceType, $referenceId);
+    }
     public static function forUser(int $userId): array { $q=database()->prepare('SELECT * FROM notifications WHERE user_id=:user_id ORDER BY created_at DESC');$q->execute(['user_id'=>$userId]);return $q->fetchAll(); }
 
     public static function filtered(int $userId, array $filters): array
