@@ -2821,9 +2821,44 @@ body.cmmp-glass .cmmp-calendar-shell .fc .fc-button:hover {
     gap: .75rem;
 }
 
+.cmmp-note-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .85rem;
+    padding: .75rem 1rem;
+    background: rgba(255, 255, 255, .72);
+    border: 1px solid rgba(255, 255, 255, .8);
+    border-radius: 14px;
+}
+
+.cmmp-note-select-all,
+.cmmp-note-select {
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    margin: 0;
+    font-weight: 600;
+    color: var(--cmmp-navy);
+    cursor: pointer;
+}
+
+.cmmp-note-select {
+    padding-top: .35rem;
+}
+
+.cmmp-note-select-all input,
+.cmmp-note-select input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--cmmp-orange);
+}
+
 .cmmp-note {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto auto 1fr auto;
     gap: 1rem;
     align-items: start;
     padding: 1rem 1.1rem;
@@ -2836,6 +2871,13 @@ body.cmmp-glass .cmmp-calendar-shell .fc .fc-button:hover {
 .cmmp-note.is-unread {
     border-left: 4px solid var(--cmmp-orange);
     background: #fff;
+}
+
+.cmmp-note-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
 }
 
 .cmmp-note-icon {
@@ -2925,10 +2967,11 @@ body.cmmp-glass .cmmp-calendar-shell .fc .fc-button:hover {
     }
 
     .cmmp-note {
-        grid-template-columns: auto 1fr;
+        grid-template-columns: auto auto 1fr;
     }
 
-    .cmmp-note form {
-        grid-column: 2;
+    .cmmp-note form,
+    .cmmp-note-actions {
+        grid-column: 2 / -1;
     }
 }

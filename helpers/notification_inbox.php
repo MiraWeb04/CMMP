@@ -57,15 +57,53 @@ function notification_filter_query(array $filters): string
     return http_build_query($params);
 }
 
+function notification_selected_ids(): array
+{
+    $raw = $_POST['ids'] ?? [];
+    if (!is_array($raw)) {
+        return [];
+    }
+
+    $ids = [];
+    foreach ($raw as $value) {
+        $id = filter_var($value, FILTER_VALIDATE_INT);
+        if ($id) {
+            $ids[] = (int) $id;
+        }
+    }
+
+    return array_values(array_unique($ids));
+}
+
 function notification_inbox_prepare(int $userId): array
 {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_valid_csrf_token();
-        $action = (string) ($_POST['action'] ?? 'read');
-        if ($action === 'read_all') {
-            Notification::markAllRead($userId);
-        } else {
-            Notification::markRead((int) ($_POST['id'] ?? 0), $userId);
+        $action = (string) ($_POST['action'] ?? '');
+        $notice = '';
+        $noticeError = '';
+        try {
+            if ($action === 'read_all') {
+                Notification::markAllRead($userId);
+            } elseif ($action === 'delete_all') {
+                Notification::deleteAllForUser($userId);
+                $notice = 'deleted_all';
+            } elseif ($action === 'delete_selected') {
+                Notification::deleteManyForUser(notification_selected_ids(), $userId);
+                $notice = 'deleted_selected';
+            } elseif ($action === 'delete' || isset($_POST['delete_one'])) {
+                $deleteId = (int) ($_POST['delete_one'] ?? $_POST['id'] ?? 0);
+                Notification::deleteForUser($deleteId, $userId);
+                $notice = 'deleted';
+            } else {
+                $readId = (int) ($_POST['mark_read'] ?? $_POST['id'] ?? 0);
+                Notification::markRead($readId, $userId);
+            }
+        } catch (InvalidArgumentException $exception) {
+            $noticeError = $exception->getMessage();
+        } catch (Throwable $exception) {
+            error_log('CMMP notification delete failed: ' . $exception->getMessage());
+            $noticeError = 'The notification could not be deleted.';
         }
         $filters = [
             'q' => trim((string) ($_POST['q'] ?? '')),
@@ -74,7 +112,13 @@ function notification_inbox_prepare(int $userId): array
             'period' => (string) ($_POST['period'] ?? 'all'),
         ];
         $query = notification_filter_query($filters + ['since' => '']);
-        header('Location: ' . basename((string) $_SERVER['SCRIPT_NAME']) . ($query === '' ? '' : '?' . $query));
+        $location = basename((string) $_SERVER['SCRIPT_NAME']) . ($query === '' ? '' : '?' . $query);
+        if ($notice !== '') {
+            $location .= ($query === '' ? '?' : '&') . $notice . '=1';
+        } elseif ($noticeError !== '') {
+            $location .= ($query === '' ? '?' : '&') . 'delete_error=' . urlencode($noticeError);
+        }
+        header('Location: ' . $location);
         exit;
     }
 
@@ -89,5 +133,6 @@ function notification_inbox_prepare(int $userId): array
         'types' => $types,
         'items' => Notification::filtered($userId, $filters),
         'unread' => Notification::unreadCount($userId),
+        'total' => Notification::countForUser($userId),
     ];
 }
