@@ -174,14 +174,77 @@ final class ServiceRequest
     {
         $query = database()->prepare(
             'SELECT sr.id, sr.request_number, sr.subject, sr.status, sr.requested_at,
-                    st.name AS service_name
+                    sr.requested_by_member_id, sr.preferred_start_datetime, sr.preferred_end_datetime,
+                    sr.completed_at, sr.hidden_from_member_at, st.name AS service_name
              FROM service_requests sr
              INNER JOIN service_types st ON st.id = sr.service_type_id
              WHERE sr.requested_by_member_id = :member_id
+               AND sr.hidden_from_member_at IS NULL
              ORDER BY sr.created_at DESC'
         );
         $query->execute(['member_id' => $memberId]);
         return $query->fetchAll();
+    }
+
+    public static function memberCanHide(array $request, int $memberId): bool
+    {
+        if ((int) ($request['requested_by_member_id'] ?? 0) !== $memberId) {
+            return false;
+        }
+        if (!empty($request['hidden_from_member_at'])) {
+            return false;
+        }
+        if (($request['status'] ?? '') !== 'COMPLETED') {
+            return false;
+        }
+
+        $occurredAt = $request['preferred_end_datetime']
+            ?: ($request['preferred_start_datetime'] ?? null)
+            ?: ($request['completed_at'] ?? null);
+        if ($occurredAt === null || trim((string) $occurredAt) === '') {
+            return true;
+        }
+
+        $timestamp = strtotime((string) $occurredAt);
+        return $timestamp !== false && $timestamp <= time();
+    }
+
+    public static function hideFromMember(int $requestId, int $memberId, ?int $userId = null): void
+    {
+        $query = database()->prepare(
+            'SELECT id, requested_by_member_id, status, preferred_start_datetime,
+                    preferred_end_datetime, completed_at, hidden_from_member_at
+             FROM service_requests
+             WHERE id = :id
+             LIMIT 1'
+        );
+        $query->execute(['id' => $requestId]);
+        $request = $query->fetch();
+        if (!$request) {
+            throw new InvalidArgumentException('Service request not found.');
+        }
+        if (!self::memberCanHide($request, $memberId)) {
+            throw new InvalidArgumentException(
+                'Only your own completed requests that have already taken place can be removed from your dashboard.'
+            );
+        }
+
+        $update = database()->prepare(
+            'UPDATE service_requests
+             SET hidden_from_member_at = NOW()
+             WHERE id = :id
+               AND requested_by_member_id = :member_id
+               AND status = "COMPLETED"
+               AND hidden_from_member_at IS NULL'
+        );
+        $update->execute(['id' => $requestId, 'member_id' => $memberId]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('The request could not be removed from your dashboard.');
+        }
+
+        if ($userId) {
+            AuditLog::record($userId, 'SERVICE_REQUEST_HIDDEN_BY_MEMBER', 'SERVICE_REQUEST', $requestId);
+        }
     }
 
     public static function paginateForAdmin(string $search, string $status): array
@@ -189,8 +252,11 @@ final class ServiceRequest
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(sr.request_number LIKE :search OR sr.subject LIKE :search OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(sr.request_number LIKE :search_number OR sr.subject LIKE :search_subject OR CONCAT(COALESCE(m.first_name, ""), " ", COALESCE(m.last_name, "")) LIKE :search_name)';
+            $parameters['search_number'] = $term;
+            $parameters['search_subject'] = $term;
+            $parameters['search_name'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'sr.status = :status';

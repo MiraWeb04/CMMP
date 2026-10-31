@@ -45,11 +45,30 @@ $dashboardRecentTitle = 'Recent requests';
 $dashboardRecentEmpty = 'You have not submitted a service or facility request yet.';
 $dashboardRecentItems = [];
 foreach (array_slice($requests, 0, 6) as $request) {
+    $actionHtml = '';
+    if (ServiceRequest::memberCanHide($request, $memberId)) {
+        ob_start();
+        $hideRequestId = (int) $request['id'];
+        $hideReturnTo = 'dashboard';
+        $hideButtonLabel = 'Remove';
+        require __DIR__ . '/../../includes/member-hide-request-form.php';
+        $actionHtml = (string) ob_get_clean();
+    }
     $dashboardRecentItems[] = [
         'title' => $request['request_number'] . ' · ' . $request['service_name'],
         'meta' => service_status_label((string) $request['status']) . ' · ' . $request['requested_at'],
         'url' => APP_BASE_URL . '/member/services/view.php?id=' . (int) $request['id'],
+        'action_html' => $actionHtml,
     ];
+}
+
+$dashboardNotice = '';
+$dashboardNoticeClass = 'alert-success';
+if (isset($_GET['hidden'])) {
+    $dashboardNotice = 'The completed request was removed from your dashboard. Church staff still have the original record.';
+} elseif (!empty($_GET['hide_error'])) {
+    $dashboardNotice = (string) $_GET['hide_error'];
+    $dashboardNoticeClass = 'alert-danger';
 }
 
 require __DIR__ . '/../../includes/role-dashboard.php';
