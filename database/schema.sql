@@ -366,6 +366,7 @@ CREATE TABLE IF NOT EXISTS service_requests (
 	reviewed_by_user_id BIGINT UNSIGNED NULL,
 	reviewed_at DATETIME NULL,
 	completed_at DATETIME NULL,
+	hidden_from_member_at DATETIME NULL,
 	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	PRIMARY KEY (id),
@@ -373,6 +374,7 @@ CREATE TABLE IF NOT EXISTS service_requests (
 	KEY idx_service_requests_type_status (service_type_id, status),
 	KEY idx_service_requests_member (requested_by_member_id),
 	KEY idx_service_requests_status (status),
+	KEY idx_service_requests_member_hidden (requested_by_member_id, hidden_from_member_at),
 	CONSTRAINT fk_service_requests_type FOREIGN KEY (service_type_id) REFERENCES service_types (id)
 		ON DELETE RESTRICT ON UPDATE CASCADE,
 	CONSTRAINT fk_service_requests_member FOREIGN KEY (requested_by_member_id) REFERENCES members (id)
