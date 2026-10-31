@@ -21,4 +21,12 @@ if((int)$pdo->query('SELECT COUNT(*) FROM notifications WHERE id='.$otherNotice)
 Notification::create($userId,'Search stay','Inbox search still works','TEST');
 $search=Notification::filtered($userId,['q'=>'stay','status'=>'all','type'=>'','since'=>'']);
 if(!is_array($search)||count($search)!==1)throw new RuntimeException('Notification search failed after unique placeholders.');
+Notification::create($userId,'Bulk one','One','TEST');
+Notification::create($userId,'Bulk two','Two','TEST');
+$ownIds=[];foreach(Notification::forUser($userId) as $row){$ownIds[]=(int)$row['id'];}
+if(Notification::deleteManyForUser($ownIds,$userId)<1)throw new RuntimeException('Selected notification delete failed.');
+Notification::create($userId,'Clear me','Gone','TEST');
+Notification::deleteAllForUser($userId);
+if(count(Notification::forUser($userId))!==0)throw new RuntimeException('Delete all failed.');
+if((int)$pdo->query('SELECT COUNT(*) FROM notifications WHERE id='.$otherNotice)->fetchColumn()!==1)throw new RuntimeException('Delete all removed another user notification.');
 echo "Communication smoke test passed.\n";}finally{$pdo->prepare('DELETE FROM notifications WHERE user_id=:id')->execute(['id'=>$userId??0]);if(!empty($otherId)){$pdo->prepare('DELETE FROM notifications WHERE user_id=:id')->execute(['id'=>$otherId]);$pdo->prepare('DELETE FROM users WHERE id=:id')->execute(['id'=>$otherId]);}if($announcementId)$pdo->prepare('DELETE FROM announcements WHERE id=:id')->execute(['id'=>$announcementId]);if($userId)$pdo->prepare('DELETE FROM users WHERE id=:id')->execute(['id'=>$userId]);}

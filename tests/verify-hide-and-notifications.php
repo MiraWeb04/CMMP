@@ -416,6 +416,18 @@ try {
         verify('Read notification belonging to the user is deleted', $deleted === 0);
         verify('Deleting a notification does not delete the linked service request', $linkedRequest === 1);
 
+        $bulkOne = insertNotification($pdo, $memberUserId, "Bulk one {$suffix}", 'One', 'TEST', null, null, null, $createdNotificationIds);
+        $bulkTwo = insertNotification($pdo, $memberUserId, "Bulk two {$suffix}", 'Two', 'TEST', null, null, null, $createdNotificationIds);
+        $bulkCount = Notification::deleteManyForUser([$bulkOne, $bulkTwo, $otherReadId], $memberUserId);
+        $otherAfterBulk = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $otherReadId)->fetchColumn();
+        verify('Delete selected removes only the current user\'s notifications', $bulkCount === 2 && $otherAfterBulk === 1);
+
+        insertNotification($pdo, $memberUserId, "Clear {$suffix}", 'Gone', 'TEST', null, null, null, $createdNotificationIds);
+        Notification::deleteAllForUser($memberUserId);
+        $memberLeft = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE user_id = ' . $memberUserId)->fetchColumn();
+        $otherAfterAll = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $otherReadId)->fetchColumn();
+        verify('Delete all empties only the current user\'s inbox', $memberLeft === 0 && $otherAfterAll === 1);
+
         $searchItems = Notification::filtered($memberUserId, ['q' => $suffix, 'status' => 'all', 'type' => '', 'since' => '']);
         verify(
             'Notification inbox search still works after delete (named parameters)',
@@ -429,22 +441,25 @@ try {
             is_string($inboxView)
             && str_contains($inboxView, 'Delete this notification?')
             && str_contains($inboxView, 'Related service requests, appointments, and events will not be deleted.')
-            && str_contains($inboxView, "name=\"action\" value=\"delete\"")
+            && str_contains($inboxView, 'name="delete_one"')
         );
         verify(
             'Notification helper exposes delete success and error messages',
             is_string($inboxHelper)
-            && str_contains($inboxHelper, "action === 'delete'")
+            && str_contains($inboxHelper, "action === 'delete_all'")
+            && str_contains($inboxHelper, "action === 'delete_selected'")
             && str_contains($inboxHelper, 'deleted')
             && str_contains($inboxHelper, 'delete_error')
             && str_contains($inboxView, 'The notification was deleted. Related church records were not changed.')
         );
         verify(
-            'Every notification shows a Delete button, including unread items',
+            'Inbox supports select, delete selected, and delete all',
             is_string($inboxView)
+            && str_contains($inboxView, 'Select all')
+            && str_contains($inboxView, 'name="ids[]"')
+            && str_contains($inboxView, 'Delete selected')
+            && str_contains($inboxView, 'Delete all')
             && str_contains($inboxView, 'Mark read')
-            && str_contains($inboxView, 'Delete this notification?')
-            && preg_match('/if \(\$isUnread\):.*?Mark read.*?endif;.*?action" value="delete"/s', $inboxView) === 1
         );
     }
 } catch (Throwable $exception) {
