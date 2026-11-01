@@ -37,7 +37,13 @@ set_exception_handler(static function (Throwable $exception): void {
     }
     $detail = APP_ENV === 'production'
         ? 'Please try again, or contact the church office if it continues.'
-        : htmlspecialchars($exception->getMessage() . ' in ' . $exception->getFile() . ':' . $exception->getLine(), ENT_QUOTES, 'UTF-8');
+        : htmlspecialchars(
+            $exception->getMessage()
+            . ($exception->getPrevious() ? ' ' . $exception->getPrevious()->getMessage() : '')
+            . ' in ' . $exception->getFile() . ':' . $exception->getLine(),
+            ENT_QUOTES,
+            'UTF-8'
+        );
     echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>CMMP error</title></head>'
         . '<body style="font-family:Arial,sans-serif;max-width:640px;margin:64px auto;padding:0 16px">'
         . '<h1>The page could not be opened</h1><p>' . $detail . '</p>'

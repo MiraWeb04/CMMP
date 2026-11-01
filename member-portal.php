@@ -52,7 +52,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
     }
 }
 
-$currentUser = authenticated_user();
+try {
+    $currentUser = authenticated_user();
+} catch (Throwable $exception) {
+    error_log('CMMP member portal could not open the current session: ' . $exception->getMessage());
+    $currentUser = null;
+    $errors[] = $exception->getMessage();
+}
 $loggedIn = $currentUser !== null;
 
 if (!function_exists('e')) {
@@ -62,9 +68,16 @@ if (!function_exists('e')) {
     }
 }
 
-$events = array_slice(Event::upcoming(0), 0, 3);
-$announcements = array_slice(Announcement::listForUser(['MEMBER']), 0, 1);
-$ministries = array_slice(Ministry::listForUser(), 0, 6);
+try {
+    $events = array_slice(Event::upcoming(0), 0, 3);
+    $announcements = array_slice(Announcement::listForUser(['MEMBER']), 0, 1);
+    $ministries = array_slice(Ministry::listForUser(), 0, 6);
+} catch (Throwable $exception) {
+    error_log('CMMP member portal public content failed: ' . $exception->getMessage());
+    $events = [];
+    $announcements = [];
+    $ministries = [];
+}
 $featured = $events[0] ?? null;
 $featuredImage = $featured ? event_image_url(isset($featured['event_image']) ? (string) $featured['event_image'] : null) : null;
 $dashboardUrl = $loggedIn ? APP_BASE_URL . role_redirect_path(current_user_roles()) : APP_BASE_URL . '/auth/login.php';

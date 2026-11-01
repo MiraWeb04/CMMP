@@ -101,8 +101,12 @@ function cmmp_ensure_schema(PDO $pdo): void
 function cmmp_schema_add_column(PDO $pdo, string $table, string $column, string $definition): void
 {
     try {
-        $found = $pdo->query('SHOW COLUMNS FROM `' . $table . '` LIKE ' . $pdo->quote($column))->fetch();
-        if (!$found) {
+        $found = $pdo->query('SHOW COLUMNS FROM `' . $table . '` LIKE ' . $pdo->quote($column));
+        $exists = $found !== false && $found->fetch() !== false;
+        if ($found instanceof PDOStatement) {
+            $found->closeCursor();
+        }
+        if (!$exists) {
             $pdo->exec('ALTER TABLE `' . $table . '` ADD COLUMN `' . $column . '` ' . $definition);
         }
     } catch (Throwable $exception) {
