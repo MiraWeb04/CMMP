@@ -213,6 +213,8 @@ try {
         'status' => 'PUBLISHED',
     ]);
     $cleanup['announcements'][] = $announcementId;
+    $visibleNow = array_map(static fn (array $row): int => (int) $row['id'], Announcement::listForUser(['MEMBER']));
+    fr07_ok('Published announcement appears in the member feed', in_array($announcementId, $visibleNow, true));
     Announcement::archive($announcementId, $adminId);
     $archived = $pdo->query('SELECT announcement_status FROM announcements WHERE id = ' . $announcementId)->fetchColumn();
     fr07_ok('Announcement can be archived', $archived === 'ARCHIVED');
@@ -222,6 +224,23 @@ try {
     Announcement::restore($announcementId, $adminId);
     $restored = $pdo->query('SELECT announcement_status FROM announcements WHERE id = ' . $announcementId)->fetchColumn();
     fr07_ok('Announcement can be restored', $restored === 'PUBLISHED');
+    $visibleRestored = array_map(static fn (array $row): int => (int) $row['id'], Announcement::listForUser(['MEMBER']));
+    fr07_ok('Restored announcement returns to the member feed', in_array($announcementId, $visibleRestored, true));
+
+    $scheduledId = Announcement::save([
+        'user_id' => $adminId,
+        'title' => 'FR07 scheduled ' . $suffix,
+        'body' => 'Future publication',
+        'audience_role' => 'ALL',
+        'published_at' => app_now()->modify('+2 hours')->format('Y-m-d H:i:s'),
+        'expires_at' => null,
+        'status' => 'PUBLISHED',
+    ]);
+    $cleanup['announcements'][] = $scheduledId;
+    Announcement::archive($scheduledId, $adminId);
+    Announcement::restore($scheduledId, $adminId);
+    $visibleScheduled = array_map(static fn (array $row): int => (int) $row['id'], Announcement::listForUser(['MEMBER']));
+    fr07_ok('Restored future-scheduled announcement stays hidden', !in_array($scheduledId, $visibleScheduled, true));
 
     $serviceTypeId = (int) $pdo->query('SELECT id FROM service_types WHERE is_active = 1 LIMIT 1')->fetchColumn();
     $pdo->prepare(
@@ -388,7 +407,9 @@ try {
         $pdo->exec('DELETE FROM service_requests WHERE id IN (' . implode(',', $cleanup['service_requests']) . ')');
     }
     if ($cleanup['announcements'] !== []) {
-        $pdo->exec('DELETE FROM announcements WHERE id IN (' . implode(',', $cleanup['announcements']) . ')');
+        $idList = implode(',', $cleanup['announcements']);
+        $pdo->exec('DELETE FROM notifications WHERE reference_type = "announcement" AND reference_id IN (' . $idList . ')');
+        $pdo->exec('DELETE FROM announcements WHERE id IN (' . $idList . ')');
     }
     if ($cleanup['ministries'] !== []) {
         $pdo->exec('DELETE FROM ministries WHERE id IN (' . implode(',', $cleanup['ministries']) . ')');

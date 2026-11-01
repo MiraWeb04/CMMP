@@ -29,7 +29,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
                     <h2 class="h5 mb-0"><?= e($announcement['title']) ?></h2>
                     <span class="badge text-bg-light"><?= e($announcement['audience_role'] ?? 'ALL') ?></span>
                 </div>
-                <p class="text-muted small mb-3"><i class="fa-solid fa-clock me-1"></i><?= e($announcement['published_at'] ?? $announcement['created_at']) ?></p>
+                    <p class="text-muted small mb-3"><i class="fa-solid fa-clock me-1"></i><?= e(format_app_datetime($announcement['published_at'] ?? $announcement['created_at']) ?: 'Recently posted') ?></p>
                 <p class="mb-0"><?= nl2br(e((string) $announcement['body'])) ?></p>
             </article>
         </div>
