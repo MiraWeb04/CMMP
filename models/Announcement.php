@@ -110,9 +110,14 @@ final class Announcement
         $expiresAt = store_app_datetime($data['expires_at'] ?? null);
 
         if ($id) {
-            $current = database()->prepare('SELECT announcement_status FROM announcements WHERE id = :id LIMIT 1');
+            $current = database()->prepare(
+                'SELECT announcement_status, published_at, expires_at FROM announcements WHERE id = :id LIMIT 1'
+            );
             $current->execute(['id' => $id]);
-            $wasPublished = (string) $current->fetchColumn() === 'PUBLISHED';
+            $currentRow = $current->fetch() ?: [];
+            $wasPublished = (string) ($currentRow['announcement_status'] ?? '') === 'PUBLISHED';
+            $publishedAt = preserve_app_datetime_seconds($currentRow['published_at'] ?? null, $publishedAt);
+            $expiresAt = preserve_app_datetime_seconds($currentRow['expires_at'] ?? null, $expiresAt);
             $q = database()->prepare('UPDATE announcements SET title=:title,body=:body,audience_role=:audience_role,published_at=:published_at,expires_at=:expires_at,announcement_status=:status WHERE id=:id');
             $q->execute([
                 'title' => $data['title'],

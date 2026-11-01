@@ -225,11 +225,17 @@ require __DIR__ . '/../../includes/pagination.php';
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="modal_status_<?= (int) $user['id'] ?>">Status</label>
-                            <select class="form-select" id="modal_status_<?= (int) $user['id'] ?>" name="status">
-                                <?php foreach (['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'] as $status): ?>
-                                    <option value="<?= $status ?>" <?= $user['status'] === $status ? 'selected' : '' ?>><?= $status ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                            <?php if ($canArchiveUsers): ?>
+                                <select class="form-select" id="modal_status_<?= (int) $user['id'] ?>" name="status">
+                                    <?php foreach (['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'] as $item): ?>
+                                        <option value="<?= $item ?>" <?= $user['status'] === $item ? 'selected' : '' ?>><?= $item ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            <?php else: ?>
+                                <input class="form-control" id="modal_status_<?= (int) $user['id'] ?>" value="<?= e((string) $user['status']) ?>" disabled>
+                                <input type="hidden" name="status" value="<?= e((string) $user['status']) ?>">
+                                <div class="form-text">Only church administrators can deactivate or reactivate accounts.</div>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="mt-4">

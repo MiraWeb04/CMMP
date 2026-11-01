@@ -54,6 +54,25 @@ function parse_app_datetime(?string $value): ?DateTimeImmutable
     return null;
 }
 
+function preserve_app_datetime_seconds(?string $existing, ?string $incoming): ?string
+{
+    if ($existing === null || $existing === '' || $incoming === null || $incoming === '') {
+        return $incoming;
+    }
+
+    $old = parse_app_datetime($existing);
+    $new = parse_app_datetime($incoming);
+    if (!$old instanceof DateTimeImmutable || !$new instanceof DateTimeImmutable) {
+        return $incoming;
+    }
+
+    if ($old->format('Y-m-d H:i') === $new->format('Y-m-d H:i')) {
+        return $old->format('Y-m-d H:i:s');
+    }
+
+    return $new->format('Y-m-d H:i:s');
+}
+
 function store_app_datetime(mixed $value): ?string
 {
     if ($value === null) {

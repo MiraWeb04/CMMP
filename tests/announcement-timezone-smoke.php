@@ -155,6 +155,38 @@ try {
     $announcementIds[] = $expiredId;
     tz_ok('Expired announcements stay hidden from the member feed', !in_array($expiredId, tz_feed_ids(), true));
 
+    $precisePublishedAt = app_now()->modify('-10 minutes')->format('Y-m-d H:i') . ':37';
+    $editId = Announcement::save([
+        'user_id' => $userId,
+        'title' => 'TZ edit ' . $suffix,
+        'body' => 'Keep the original publication second',
+        'audience_role' => 'ALL',
+        'published_at' => $precisePublishedAt,
+        'expires_at' => null,
+        'status' => 'PUBLISHED',
+    ]);
+    $announcementIds[] = $editId;
+    $storedBefore = (string) $pdo->query('SELECT published_at FROM announcements WHERE id = ' . $editId)->fetchColumn();
+    Announcement::save([
+        'user_id' => $userId,
+        'title' => 'TZ edit ' . $suffix,
+        'body' => 'Edited title only',
+        'audience_role' => 'ALL',
+        'published_at' => datetime_local_value($storedBefore),
+        'expires_at' => null,
+        'status' => 'PUBLISHED',
+    ], $editId);
+    $storedAfter = (string) $pdo->query('SELECT published_at FROM announcements WHERE id = ' . $editId)->fetchColumn();
+    tz_ok(
+        'Editing an announcement does not shift its publication time',
+        $storedBefore === $precisePublishedAt && $storedAfter === $precisePublishedAt,
+        'before=' . $storedBefore . ' after=' . $storedAfter
+    );
+    tz_ok(
+        'Edited eligible announcement remains visible in the member feed',
+        in_array($editId, tz_feed_ids(), true)
+    );
+
     $auditActions = $pdo->prepare(
         'SELECT action FROM activity_logs WHERE entity_type = "ANNOUNCEMENT" AND entity_id = :id ORDER BY id'
     );
