@@ -6,6 +6,7 @@ require_once __DIR__ . '/../services/NotificationService.php';
 require_once __DIR__ . '/Notification.php';
 require_once __DIR__ . '/AuditLog.php';
 require_once __DIR__ . '/ChurchCalendar.php';
+require_once __DIR__ . '/Personnel.php';
 
 final class ServiceRequest
 {
@@ -593,8 +594,98 @@ final class ServiceRequest
         Counseling::createCase($serviceRequestId, 3);
     }
 
+    public static function relationshipCounts(int $id): array
+    {
+        $pdo = database();
+        $count = static function (string $sql) use ($pdo, $id): int {
+            $query = $pdo->prepare($sql);
+            $query->execute(['id' => $id]);
+            return (int) $query->fetchColumn();
+        };
+
+        return [
+            'assignments' => $count('SELECT COUNT(*) FROM service_assignments WHERE service_request_id = :id'),
+            'documents' => $count('SELECT COUNT(*) FROM service_documents WHERE service_request_id = :id'),
+            'appointments' => $count('SELECT COUNT(*) FROM appointments WHERE service_request_id = :id'),
+            'counseling_cases' => $count('SELECT COUNT(*) FROM counseling_cases WHERE service_request_id = :id'),
+            'history' => $count('SELECT COUNT(*) FROM service_status_history WHERE service_request_id = :id'),
+        ];
+    }
+
+    public static function canPermanentlyDelete(array $request, ?array $counts = null): bool
+    {
+        $status = (string) ($request['status'] ?? '');
+        if (!in_array($status, ['PENDING', 'PENDING_ASSIGNMENT', 'UNDER_REVIEW'], true)) {
+            return false;
+        }
+        $counts ??= self::relationshipCounts((int) $request['id']);
+
+        return (int) ($counts['appointments'] ?? 0) === 0
+            && (int) ($counts['counseling_cases'] ?? 0) === 0
+            && (int) ($counts['assignments'] ?? 0) === 0
+            && (int) ($counts['documents'] ?? 0) === 0;
+    }
+
+    public static function archive(int $id, ?int $userId = null, ?string $note = null): void
+    {
+        $request = self::find($id);
+        if (!$request) {
+            throw new InvalidArgumentException('Service request not found.');
+        }
+        $status = (string) ($request['status'] ?? '');
+        if ($status === 'COMPLETED') {
+            throw new InvalidArgumentException('Completed requests are kept for history and cannot be deleted.');
+        }
+        if ($status === 'CANCELLED') {
+            throw new InvalidArgumentException('This request is already cancelled.');
+        }
+
+        if (!in_array($status, ['REJECTED', 'CANCELLED'], true)) {
+            self::updateStatus($id, 'CANCELLED', $userId, $note ?: 'Archived by an administrator. Historical records were kept.');
+        }
+
+        require_once __DIR__ . '/../services/SchedulingService.php';
+        $appointments = database()->prepare(
+            'SELECT id FROM appointments WHERE service_request_id = :id AND status NOT IN ("CANCELLED", "COMPLETED")'
+        );
+        $appointments->execute(['id' => $id]);
+        foreach ($appointments->fetchAll() as $appointment) {
+            try {
+                SchedulingService::cancelAppointment((int) $appointment['id'], $userId);
+            } catch (Throwable $exception) {
+                error_log('CMMP appointment cancel during request archive failed: ' . $exception->getMessage());
+            }
+        }
+
+        AuditLog::record($userId, 'SERVICE_REQUEST_ARCHIVED', 'SERVICE_REQUEST', $id);
+    }
+
+    public static function deletePermanently(int $id, ?int $userId = null): void
+    {
+        $request = self::find($id);
+        if (!$request) {
+            throw new InvalidArgumentException('Service request not found.');
+        }
+        $counts = self::relationshipCounts($id);
+        if (!self::canPermanentlyDelete($request, $counts)) {
+            throw new InvalidArgumentException(
+                'This request has related appointments, assignments, documents, or counseling history and can only be cancelled.'
+            );
+        }
+
+        $delete = database()->prepare('DELETE FROM service_requests WHERE id = :id');
+        $delete->execute(['id' => $id]);
+        if ($delete->rowCount() !== 1) {
+            throw new RuntimeException('The service request could not be deleted.');
+        }
+        AuditLog::record($userId, 'SERVICE_REQUEST_DELETED', 'SERVICE_REQUEST', $id, [
+            'request_number' => (string) ($request['request_number'] ?? ''),
+        ]);
+    }
+
     public static function assign(int $id, int $staffId, string $role, ?int $userId): void
     {
+        Personnel::assertAssignable($staffId);
         $trimmedRole = strtoupper(trim($role));
         if (!in_array($trimmedRole, ['PASTOR', 'COUNSELOR'], true)) {
             $trimmedRole = 'STAFF_ASSIGNMENT';

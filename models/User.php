@@ -101,6 +101,131 @@ final class User
         return $user ?: null;
     }
 
+    public static function roleCodes(int $id): array
+    {
+        $query = database()->prepare(
+            'SELECT r.code
+             FROM user_roles ur
+             INNER JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = :id'
+        );
+        $query->execute(['id' => $id]);
+        return array_column($query->fetchAll(), 'code');
+    }
+
+    public static function isLastActiveSuperAdmin(int $id): bool
+    {
+        if (!in_array('SUPER_ADMIN', self::roleCodes($id), true)) {
+            return false;
+        }
+        $query = database()->prepare(
+            'SELECT COUNT(*)
+             FROM users u
+             INNER JOIN user_roles ur ON ur.user_id = u.id
+             INNER JOIN roles r ON r.id = ur.role_id
+             WHERE r.code = "SUPER_ADMIN"
+               AND u.status = "ACTIVE"
+               AND u.id <> :id'
+        );
+        $query->execute(['id' => $id]);
+
+        return (int) $query->fetchColumn() === 0;
+    }
+
+    public static function setStatus(int $id, string $status, ?int $actorId = null): void
+    {
+        if (!in_array($status, ['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'], true)) {
+            throw new InvalidArgumentException('Invalid user status.');
+        }
+        $user = self::find($id);
+        if (!$user) {
+            throw new InvalidArgumentException('User not found.');
+        }
+        if ($actorId && $actorId === $id && $status !== 'ACTIVE') {
+            throw new InvalidArgumentException('You cannot deactivate your own account.');
+        }
+        if ($status !== 'ACTIVE' && self::isLastActiveSuperAdmin($id)) {
+            throw new InvalidArgumentException('The last active super administrator cannot be deactivated.');
+        }
+
+        $query = database()->prepare('UPDATE users SET status = :status WHERE id = :id');
+        $query->execute(['id' => $id, 'status' => $status]);
+        AuditLog::record(
+            $actorId,
+            $status === 'ACTIVE' ? 'USER_REACTIVATED' : 'USER_DEACTIVATED',
+            'USER',
+            $id,
+            ['status' => $status]
+        );
+    }
+
+    public static function deactivate(int $id, ?int $actorId = null): void
+    {
+        self::setStatus($id, 'INACTIVE', $actorId);
+    }
+
+    public static function reactivate(int $id, ?int $actorId = null): void
+    {
+        self::setStatus($id, 'ACTIVE', $actorId);
+    }
+
+    public static function relationshipCounts(int $id): array
+    {
+        $pdo = database();
+        $count = static function (string $sql) use ($pdo, $id): int {
+            $query = $pdo->prepare($sql);
+            $query->execute(['id' => $id]);
+            return (int) $query->fetchColumn();
+        };
+
+        return [
+            'members' => $count('SELECT COUNT(*) FROM members WHERE user_id = :id'),
+            'staff' => $count('SELECT COUNT(*) FROM staff WHERE user_id = :id'),
+            'events' => $count('SELECT COUNT(*) FROM events WHERE created_by_user_id = :id'),
+            'announcements' => $count('SELECT COUNT(*) FROM announcements WHERE created_by_user_id = :id'),
+            'reviewed_requests' => $count('SELECT COUNT(*) FROM service_requests WHERE reviewed_by_user_id = :id'),
+        ];
+    }
+
+    public static function canPermanentlyDelete(int $id): bool
+    {
+        $user = self::find($id);
+        if (!$user) {
+            return false;
+        }
+        if (!in_array((string) $user['status'], ['PENDING', 'INACTIVE'], true)) {
+            return false;
+        }
+        if (self::isLastActiveSuperAdmin($id)) {
+            return false;
+        }
+        $counts = self::relationshipCounts($id);
+
+        return (int) $counts['members'] === 0
+            && (int) $counts['staff'] === 0
+            && (int) $counts['events'] === 0
+            && (int) $counts['announcements'] === 0
+            && (int) $counts['reviewed_requests'] === 0;
+    }
+
+    public static function deletePermanently(int $id, int $actorId): void
+    {
+        if ($actorId === $id) {
+            throw new InvalidArgumentException('You cannot delete your own account.');
+        }
+        if (!self::canPermanentlyDelete($id)) {
+            throw new InvalidArgumentException(
+                'This account is linked to church records and can only be deactivated.'
+            );
+        }
+        $delete = database()->prepare('DELETE FROM users WHERE id = :id');
+        $delete->execute(['id' => $id]);
+        if ($delete->rowCount() !== 1) {
+            throw new RuntimeException('The user could not be deleted.');
+        }
+        AuditLog::record($actorId, 'USER_DELETED', 'USER', $id);
+    }
+
     public static function findByEmail(string $email): ?array
     {
         $query = database()->prepare(

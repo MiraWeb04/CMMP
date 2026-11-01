@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/../services/NotificationService.php';
+require_once __DIR__ . '/AuditLog.php';
 
 final class Ministry
 {
@@ -49,9 +50,18 @@ final class Ministry
         return $ministries;
     }
 
-    public static function paginateAdmin(int $page, int $perPage): array
+    public static function paginateAdmin(int $page, int $perPage, string $status = ''): array
     {
-        $total = (int) database()->query('SELECT COUNT(*) FROM ministries')->fetchColumn();
+        $status = strtoupper(trim($status));
+        $where = '';
+        $params = [];
+        if (in_array($status, ['ACTIVE', 'INACTIVE'], true)) {
+            $where = 'WHERE m.ministry_status = :status';
+            $params['status'] = $status;
+        }
+        $count = database()->prepare('SELECT COUNT(*) FROM ministries m ' . $where);
+        $count->execute($params);
+        $total = (int) $count->fetchColumn();
         $query = database()->prepare(
             'SELECT m.id, m.name, m.code, m.description, m.ministry_status,
                     COALESCE(CONCAT(leader_member.first_name, " ", leader_member.last_name), "Not assigned") AS leader_name,
@@ -60,10 +70,14 @@ final class Ministry
              LEFT JOIN staff leader_staff ON leader_staff.id = m.leader_staff_id
              LEFT JOIN members leader_member ON leader_member.id = leader_staff.member_id
              LEFT JOIN ministry_members mm ON mm.ministry_id = m.id AND mm.left_at IS NULL
+             ' . $where . '
              GROUP BY m.id
              ORDER BY m.name
              LIMIT :limit OFFSET :offset'
         );
+        foreach ($params as $key => $value) {
+            $query->bindValue(':' . $key, $value, PDO::PARAM_STR);
+        }
         $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
         $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
         $query->execute();
@@ -122,10 +136,24 @@ final class Ministry
         $query->execute(['id' => $id, 'name' => $data['name'], 'description' => $data['description'], 'leader_staff_id' => $leaderStaffId > 0 ? $leaderStaffId : null]);
     }
 
-    public static function setStatus(int $id, string $status): void
+    public static function setStatus(int $id, string $status, ?int $userId = null): void
     {
+        if (!in_array($status, ['ACTIVE', 'INACTIVE'], true)) {
+            throw new InvalidArgumentException('Invalid ministry status.');
+        }
+        $ministry = self::find($id);
+        if (!$ministry) {
+            throw new InvalidArgumentException('Ministry not found.');
+        }
         $query = database()->prepare('UPDATE ministries SET ministry_status = :status WHERE id = :id');
         $query->execute(['id' => $id, 'status' => $status]);
+        AuditLog::record(
+            $userId,
+            $status === 'ACTIVE' ? 'MINISTRY_REACTIVATED' : 'MINISTRY_DEACTIVATED',
+            'MINISTRY',
+            $id,
+            ['status' => $status]
+        );
     }
 
     public static function activeMembersWithMinistries(?int $excludeMinistryId = null): array
@@ -398,6 +426,18 @@ final class Ministry
     {
         if ($staffId <= 0) {
             return;
+        }
+
+        $staff = database()->prepare(
+            'SELECT employment_status FROM staff WHERE id = :id LIMIT 1'
+        );
+        $staff->execute(['id' => $staffId]);
+        $employment = $staff->fetchColumn();
+        if ($employment === false) {
+            throw new InvalidArgumentException('The selected leader was not found.');
+        }
+        if ((string) $employment !== 'ACTIVE') {
+            throw new InvalidArgumentException('Inactive personnel cannot be assigned as ministry leaders.');
         }
 
         $memberId = self::memberIdForStaff($staffId);

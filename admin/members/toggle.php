@@ -12,6 +12,11 @@ $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 $member = $id ? Member::find($id) : null;
 if (!$member) { http_response_code(404); exit('Member not found.'); }
 $status = $member['membership_status'] === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-Member::setStatus((int) $member['id'], $status);
+try {
+    Member::setStatus((int) $member['id'], $status, current_user_id());
+} catch (InvalidArgumentException $exception) {
+    header('Location: view.php?id=' . (int) $member['id'] . '&error=' . urlencode($exception->getMessage()));
+    exit;
+}
 header('Location: view.php?id=' . (int) $member['id'] . '&status_changed=1');
 exit;

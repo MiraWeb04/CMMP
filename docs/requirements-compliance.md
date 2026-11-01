@@ -12,14 +12,14 @@ These statements match the student-template requirement IDs and the software now
 | FR-04 | Users can view and update their own profile. | Met |
 | FR-05 | Authorized users can create records. | Met |
 | FR-06 | Authorized users can edit records. | Met |
-| FR-07 | Authorized users can archive or delete records. | Met |
+| FR-07 | Authorized users can archive or delete records. | Met (verified in PHP smoke tests; see notes) |
 | FR-08 | Users can search and filter records. | Met |
 | FR-09 | The system generates summary reports. | Met |
 | FR-10 | Protected actions follow role permissions. | Met |
 
 FR-04: members use `member/profile`. Administrators, staff, pastors, counselors, and ministry leaders use `account/profile.php` to update email, contact details, and password. Username, employee number, and roles stay admin-managed.
 
-FR-07: people are deactivated (members, staff, pastors, counselors). Ministries use `ACTIVE` / `INACTIVE`. Announcements can be archived. Members can hide their completed service requests. Administrators may hard-delete selected users, service requests, and a user's own notifications.
+FR-07: people are deactivated and can be reactivated (members, staff, pastors, counselors, portal users). Inactive personnel cannot receive new assignments. Ministries and facilities use active/inactive status. Announcements can be archived and restored. Members can hide their completed service requests. Users may delete their own read notifications. Service requests with history are cancelled rather than hard-deleted. Permanent deletion is allowed only for unused pending requests or unused pending/inactive user accounts. Historical appointments, attendance, registrations, and audit rows are kept. There is no separate appointment directory UI; appointments are cancelled when their parent request is archived.
 
 ## Non-functional requirements
 

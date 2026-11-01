@@ -8,17 +8,41 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../models/User.php';
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 $canApproveMembers = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
+$canArchiveUsers = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
 
 $pdo = database();
 $roles = $pdo->query('SELECT id, code FROM roles ORDER BY code')->fetchAll();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user_id'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['user_action'], $_POST['user_id'])) {
     require_valid_csrf_token();
-    $deleteId = filter_input(INPUT_POST, 'delete_user_id', FILTER_VALIDATE_INT);
-    if ($deleteId) {
-        $delete = $pdo->prepare('DELETE FROM users WHERE id = :id');
-        $delete->execute(['id' => $deleteId]);
-        header('Location: index.php?deleted=1');
+    if (!$canArchiveUsers) {
+        header('Location: index.php?error=' . urlencode('Only church administrators can deactivate or delete users.'));
+        exit;
+    }
+    $targetId = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
+    $action = (string) $_POST['user_action'];
+    try {
+        if (!$targetId) {
+            throw new InvalidArgumentException('Invalid user.');
+        }
+        if ($action === 'deactivate') {
+            User::deactivate((int) $targetId, current_user_id());
+            header('Location: index.php?deactivated=1');
+            exit;
+        }
+        if ($action === 'reactivate') {
+            User::reactivate((int) $targetId, current_user_id());
+            header('Location: index.php?reactivated=1');
+            exit;
+        }
+        if ($action === 'delete') {
+            User::deletePermanently((int) $targetId, (int) current_user_id());
+            header('Location: index.php?deleted=1');
+            exit;
+        }
+        throw new InvalidArgumentException('Unknown user action.');
+    } catch (InvalidArgumentException $exception) {
+        header('Location: index.php?error=' . urlencode($exception->getMessage()));
         exit;
     }
 }
@@ -55,7 +79,13 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 <div class="alert alert-success">User updated.</div>
 <?php endif; ?>
 <?php if (isset($_GET['deleted'])): ?>
-<div class="alert alert-success">User deleted.</div>
+<div class="alert alert-success">User deleted. The account had no linked church records.</div>
+<?php endif; ?>
+<?php if (isset($_GET['deactivated'])): ?>
+<div class="alert alert-success">User deactivated. They can no longer sign in. Historical records were kept.</div>
+<?php endif; ?>
+<?php if (isset($_GET['reactivated'])): ?>
+<div class="alert alert-success">User reactivated.</div>
 <?php endif; ?>
 <?php if (isset($_GET['approved'])): ?>
 <div class="alert alert-success">The registration is approved. That member can sign in.</div>
@@ -126,11 +156,31 @@ $pendingCount = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'PE
                         <td class="text-end">
                             <div class="btn-group">
                                 <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#editUserModal<?= (int) $user['id'] ?>">Edit</button>
-                                <form method="post" class="d-inline" onsubmit="return confirm('Delete this user?');">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="delete_user_id" value="<?= (int) $user['id'] ?>">
-                                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                                </form>
+                                <?php if ($canArchiveUsers && (int) $user['id'] !== (int) current_user_id()): ?>
+                                    <?php if ($user['status'] === 'ACTIVE'): ?>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Deactivate this user? They will not be able to sign in. Church records stay in place.');">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="user_action" value="deactivate">
+                                            <input type="hidden" name="user_id" value="<?= (int) $user['id'] ?>">
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">Deactivate</button>
+                                        </form>
+                                    <?php elseif (in_array((string) $user['status'], ['INACTIVE', 'LOCKED'], true)): ?>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Reactivate this user?');">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="user_action" value="reactivate">
+                                            <input type="hidden" name="user_id" value="<?= (int) $user['id'] ?>">
+                                            <button class="btn btn-sm btn-outline-success" type="submit">Reactivate</button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <?php if (User::canPermanentlyDelete((int) $user['id'])): ?>
+                                        <form method="post" class="d-inline" onsubmit="return confirm('Permanently delete this unused account? This cannot be undone.');">
+                                            <?= csrf_field() ?>
+                                            <input type="hidden" name="user_action" value="delete">
+                                            <input type="hidden" name="user_id" value="<?= (int) $user['id'] ?>">
+                                            <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                                        </form>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>

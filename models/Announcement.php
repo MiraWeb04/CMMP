@@ -39,12 +39,24 @@ final class Announcement
     }
     public static function all(): array { return database()->query('SELECT * FROM announcements ORDER BY created_at DESC')->fetchAll(); }
 
-    public static function paginate(int $page, int $perPage): array
+    public static function paginate(int $page, int $perPage, string $status = ''): array
     {
-        $total = (int) database()->query('SELECT COUNT(*) FROM announcements')->fetchColumn();
+        $status = strtoupper(trim($status));
+        $where = '';
+        $params = [];
+        if (in_array($status, ['DRAFT', 'PUBLISHED', 'ARCHIVED'], true)) {
+            $where = 'WHERE announcement_status = :status';
+            $params['status'] = $status;
+        }
+        $count = database()->prepare('SELECT COUNT(*) FROM announcements ' . $where);
+        $count->execute($params);
+        $total = (int) $count->fetchColumn();
         $query = database()->prepare(
-            'SELECT * FROM announcements ORDER BY created_at DESC LIMIT :limit OFFSET :offset'
+            'SELECT * FROM announcements ' . $where . ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset'
         );
+        foreach ($params as $key => $value) {
+            $query->bindValue(':' . $key, $value, PDO::PARAM_STR);
+        }
         $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
         $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
         $query->execute();
@@ -53,9 +65,37 @@ final class Announcement
 
     public static function archive(int $id, ?int $userId = null): void
     {
+        $current = database()->prepare('SELECT announcement_status FROM announcements WHERE id = :id LIMIT 1');
+        $current->execute(['id' => $id]);
+        $status = $current->fetchColumn();
+        if ($status === false) {
+            throw new InvalidArgumentException('Announcement not found.');
+        }
+        if ((string) $status === 'ARCHIVED') {
+            throw new InvalidArgumentException('This announcement is already archived.');
+        }
         $query = database()->prepare('UPDATE announcements SET announcement_status = "ARCHIVED" WHERE id = :id');
         $query->execute(['id' => $id]);
         AuditLog::record($userId, 'ANNOUNCEMENT_ARCHIVED', 'ANNOUNCEMENT', $id);
+    }
+
+    public static function restore(int $id, ?int $userId = null): void
+    {
+        $current = database()->prepare(
+            'SELECT announcement_status, published_at FROM announcements WHERE id = :id LIMIT 1'
+        );
+        $current->execute(['id' => $id]);
+        $row = $current->fetch();
+        if (!$row) {
+            throw new InvalidArgumentException('Announcement not found.');
+        }
+        if ((string) $row['announcement_status'] !== 'ARCHIVED') {
+            throw new InvalidArgumentException('Only archived announcements can be restored.');
+        }
+        $status = $row['published_at'] !== null ? 'PUBLISHED' : 'DRAFT';
+        $query = database()->prepare('UPDATE announcements SET announcement_status = :status WHERE id = :id');
+        $query->execute(['status' => $status, 'id' => $id]);
+        AuditLog::record($userId, 'ANNOUNCEMENT_RESTORED', 'ANNOUNCEMENT', $id, ['status' => $status]);
     }
     public static function save(array $data, ?int $id=null): int
     {

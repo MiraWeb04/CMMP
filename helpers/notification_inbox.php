@@ -86,8 +86,8 @@ function notification_inbox_prepare(int $userId): array
             if ($action === 'read_all') {
                 Notification::markAllRead($userId);
             } elseif ($action === 'delete_all') {
-                Notification::deleteAllForUser($userId);
-                $notice = 'deleted_all';
+                $removed = Notification::deleteAllForUser($userId);
+                $notice = $removed > 0 ? 'deleted_all' : 'none_read';
             } elseif ($action === 'delete_selected') {
                 Notification::deleteManyForUser(notification_selected_ids(), $userId);
                 $notice = 'deleted_selected';
