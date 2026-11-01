@@ -85,8 +85,8 @@ require __DIR__ . '/../../includes/header.php';
                     <td><?= e($item['title']) ?></td>
                     <td><?= e($item['audience_role'] ?? 'ALL') ?></td>
                     <td><?= e($item['announcement_status']) ?></td>
-                    <td><?= e($item['published_at'] ?? 'Not published') ?></td>
-                    <td><?= e($item['expires_at'] ?? 'Never') ?></td>
+                    <td><?= e(format_app_datetime($item['published_at'] ?? null) ?: 'Not published') ?></td>
+                    <td><?= e(format_app_datetime($item['expires_at'] ?? null) ?: 'Never') ?></td>
                     <td class="text-nowrap">
                         <a class="btn btn-sm btn-outline-primary" href="edit.php?id=<?= (int) $item['id'] ?>">Edit</a>
                         <?php if ($item['announcement_status'] === 'ARCHIVED'): ?>

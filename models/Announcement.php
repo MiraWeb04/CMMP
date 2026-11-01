@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/datetime.php';
 require_once __DIR__ . '/AuditLog.php';
 final class Announcement
 {
@@ -23,18 +24,22 @@ final class Announcement
             return [];
         }
 
+        // Existing announcement DATETIME values are naive Asia/Manila wall-clock
+        // timestamps written by PHP. Compare against the application clock, not
+        // MySQL NOW(), because the database session may be UTC.
+        $now = app_now_sql();
         $placeholders = implode(',', array_fill(0, count($audiences), '?'));
         $query = database()->prepare(
             'SELECT *
              FROM announcements
              WHERE announcement_status = "PUBLISHED"
                AND published_at IS NOT NULL
-               AND published_at <= NOW()
-               AND (expires_at IS NULL OR expires_at > NOW())
+               AND published_at <= ?
+               AND (expires_at IS NULL OR expires_at > ?)
                AND (audience_role IS NULL OR audience_role = "ALL" OR audience_role IN (' . $placeholders . '))
              ORDER BY published_at DESC, created_at DESC'
         );
-        $query->execute($audiences);
+        $query->execute(array_merge([$now, $now], $audiences));
         return $query->fetchAll();
     }
     public static function all(): array { return database()->query('SELECT * FROM announcements ORDER BY created_at DESC')->fetchAll(); }
@@ -101,6 +106,9 @@ final class Announcement
     {
         require_once __DIR__ . '/../services/NotificationService.php';
         $wasPublished = false;
+        $publishedAt = store_app_datetime($data['published_at'] ?? null);
+        $expiresAt = store_app_datetime($data['expires_at'] ?? null);
+
         if ($id) {
             $current = database()->prepare('SELECT announcement_status FROM announcements WHERE id = :id LIMIT 1');
             $current->execute(['id' => $id]);
@@ -110,8 +118,8 @@ final class Announcement
                 'title' => $data['title'],
                 'body' => $data['body'],
                 'audience_role' => $data['audience_role'],
-                'published_at' => $data['published_at'],
-                'expires_at' => $data['expires_at'],
+                'published_at' => $publishedAt,
+                'expires_at' => $expiresAt,
                 'status' => $data['status'],
                 'id' => $id,
             ]);
@@ -122,8 +130,8 @@ final class Announcement
                 'title' => $data['title'],
                 'body' => $data['body'],
                 'audience_role' => $data['audience_role'],
-                'published_at' => $data['published_at'],
-                'expires_at' => $data['expires_at'],
+                'published_at' => $publishedAt,
+                'expires_at' => $expiresAt,
                 'status' => $data['status'],
             ]);
             $id = (int) database()->lastInsertId();
