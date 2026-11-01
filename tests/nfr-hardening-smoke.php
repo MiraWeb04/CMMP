@@ -109,6 +109,10 @@ try {
     assert_true(User::verifyPassword($userId, 'NewPass12'), 'Reset password is stored as a hash that verifies');
 
     $errors = save_account_profile($userId, [
+        'first_name' => 'Nfr',
+        'middle_name' => '',
+        'last_name' => 'Tester',
+        'suffix' => '',
         'email' => 'nfr-updated-' . $suffix . '@example.test',
         'current_password' => 'NewPass12',
         'password' => 'FinalPass12',
@@ -117,9 +121,13 @@ try {
         'address_line_1' => 'New Street',
         'address_line_2' => '',
         'city' => 'Manila',
+        'state_province' => '',
+        'postal_code' => '',
+        'country' => 'Philippines',
         'emergency_contact_name' => 'Guardian',
         'emergency_contact_relationship' => 'Parent',
         'emergency_contact_phone' => '09170000888',
+        'remove_profile_photo' => false,
     ], Member::find($memberId));
     assert_true($errors === [], 'Staff-style profile update succeeds');
     $fresh = User::find($userId);

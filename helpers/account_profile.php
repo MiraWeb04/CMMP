@@ -7,28 +7,44 @@ require_once __DIR__ . '/member.php';
 
 function account_profile_payload(array $source): array
 {
-    return [
-        'email' => trim((string) ($source['email'] ?? '')),
-        'current_password' => (string) ($source['current_password'] ?? ''),
-        'password' => (string) ($source['password'] ?? ''),
-        'password_confirmation' => (string) ($source['password_confirmation'] ?? ''),
-        'phone' => trim((string) ($source['phone'] ?? '')),
-        'address_line_1' => trim((string) ($source['address_line_1'] ?? '')),
-        'address_line_2' => trim((string) ($source['address_line_2'] ?? '')),
-        'city' => trim((string) ($source['city'] ?? '')),
-        'emergency_contact_name' => trim((string) ($source['emergency_contact_name'] ?? '')),
-        'emergency_contact_relationship' => trim((string) ($source['emergency_contact_relationship'] ?? '')),
-        'emergency_contact_phone' => trim((string) ($source['emergency_contact_phone'] ?? '')),
+    $fields = [
+        'first_name', 'middle_name', 'last_name', 'suffix', 'email', 'phone',
+        'address_line_1', 'address_line_2', 'city', 'state_province', 'postal_code', 'country',
+        'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
     ];
+    $data = [];
+    foreach ($fields as $field) {
+        $data[$field] = trim((string) ($source[$field] ?? ''));
+    }
+    $data['current_password'] = (string) ($source['current_password'] ?? '');
+    $data['password'] = (string) ($source['password'] ?? '');
+    $data['password_confirmation'] = (string) ($source['password_confirmation'] ?? '');
+    $data['remove_profile_photo'] = !empty($source['remove_profile_photo']);
+
+    return $data;
 }
 
-function save_account_profile(int $userId, array $input, ?array $member): array
+function save_account_profile(int $userId, array $input, ?array $member, ?array $photoFile = null): array
 {
     $errors = [];
+    if ($userId !== (int) (current_user_id() ?? 0) && PHP_SAPI !== 'cli') {
+        return ['You can only update your own profile.'];
+    }
+    if ($userId < 1) {
+        return ['You can only update your own profile.'];
+    }
+
     if (!filter_var($input['email'], FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Enter a valid email address.';
     } elseif (User::emailTaken($input['email'], $userId)) {
         $errors[] = 'That email is already used by another account.';
+    }
+
+    if (trim($input['first_name']) === '') {
+        $errors[] = 'First name is required.';
+    }
+    if (trim($input['last_name']) === '') {
+        $errors[] = 'Last name is required.';
     }
 
     $changingPassword = $input['password'] !== '' || $input['password_confirmation'] !== '' || $input['current_password'] !== '';
@@ -44,11 +60,20 @@ function save_account_profile(int $userId, array $input, ?array $member): array
         }
     }
 
-    if ($member) {
-        foreach (['emergency_contact_phone' => 'Emergency contact phone', 'phone' => 'Phone'] as $field => $label) {
-            if ($input[$field] !== '' && !preg_match('/^[0-9+\-().\s]{7,30}$/', $input[$field])) {
-                $errors[] = $label . ' must be a valid phone number.';
-            }
+    foreach (['emergency_contact_phone' => 'Emergency contact phone', 'phone' => 'Contact number'] as $field => $label) {
+        if ($input[$field] !== '' && !preg_match('/^[0-9+\-().\s]{7,30}$/', $input[$field])) {
+            $errors[] = $label . ' must be a valid phone number.';
+        }
+    }
+
+    $newPhoto = null;
+    if ($photoFile && ($photoFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+        try {
+            $newPhoto = upload_member_photo($photoFile);
+        } catch (Throwable $exception) {
+            $errors[] = $exception instanceof RuntimeException
+                ? $exception->getMessage()
+                : 'The profile photo could not be saved.';
         }
     }
 
@@ -61,17 +86,40 @@ function save_account_profile(int $userId, array $input, ?array $member): array
         User::updatePassword($userId, $input['password']);
     }
 
+    if (!$member) {
+        $memberId = Member::createFromRegistration($userId, [
+            'first_name' => $input['first_name'],
+            'last_name' => $input['last_name'],
+            'email' => $input['email'],
+        ]);
+        $member = Member::find($memberId);
+    }
+
     if ($member) {
         $updates = [
+            'first_name' => $input['first_name'],
+            'middle_name' => $input['middle_name'] !== '' ? $input['middle_name'] : null,
+            'last_name' => $input['last_name'],
+            'suffix' => $input['suffix'] !== '' ? $input['suffix'] : null,
             'email' => $input['email'],
             'phone' => $input['phone'] !== '' ? $input['phone'] : null,
             'address_line_1' => $input['address_line_1'] !== '' ? $input['address_line_1'] : null,
             'address_line_2' => $input['address_line_2'] !== '' ? $input['address_line_2'] : null,
             'city' => $input['city'] !== '' ? $input['city'] : null,
+            'state_province' => $input['state_province'] !== '' ? $input['state_province'] : null,
+            'postal_code' => $input['postal_code'] !== '' ? $input['postal_code'] : null,
+            'country' => $input['country'] !== '' ? $input['country'] : null,
             'emergency_contact_name' => $input['emergency_contact_name'] !== '' ? $input['emergency_contact_name'] : null,
             'emergency_contact_relationship' => $input['emergency_contact_relationship'] !== '' ? $input['emergency_contact_relationship'] : null,
             'emergency_contact_phone' => $input['emergency_contact_phone'] !== '' ? $input['emergency_contact_phone'] : null,
         ];
+        if ($newPhoto !== null) {
+            delete_profile_photo(isset($member['profile_photo']) ? (string) $member['profile_photo'] : null);
+            $updates['profile_photo'] = $newPhoto;
+        } elseif ($input['remove_profile_photo']) {
+            delete_profile_photo(isset($member['profile_photo']) ? (string) $member['profile_photo'] : null);
+            $updates['profile_photo'] = null;
+        }
         Member::update((int) $member['id'], $updates);
     }
 
@@ -80,10 +128,5 @@ function save_account_profile(int $userId, array $input, ?array $member): array
 
 function account_profile_url(): string
 {
-    $roles = current_user_roles();
-    if (in_array('MEMBER', $roles, true) && !array_intersect($roles, ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR', 'COUNSELOR', 'MINISTRY_LEADER'])) {
-        return APP_BASE_URL . '/member/profile/';
-    }
-
     return APP_BASE_URL . '/account/profile.php';
 }

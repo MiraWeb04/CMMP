@@ -588,7 +588,50 @@ a.cmmp-auth-brand-row:hover {
     display: inline-flex;
     height: 36px;
     justify-content: center;
+    overflow: hidden;
     width: 36px;
+}
+
+.cmmp-avatar img {
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+}
+
+.cmmp-profile-photo-preview {
+    align-items: center;
+    background: var(--cmmp-secondary-soft);
+    border: 1px solid var(--cmmp-border);
+    border-radius: 1rem;
+    display: flex;
+    justify-content: center;
+    min-height: 220px;
+    overflow: hidden;
+}
+
+.cmmp-profile-photo-preview img {
+    display: block;
+    max-height: 280px;
+    object-fit: cover;
+    width: 100%;
+}
+
+.cmmp-profile-photo-fallback {
+    align-items: center;
+    background: var(--cmmp-orange);
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    font-size: 3rem;
+    height: 140px;
+    justify-content: center;
+    width: 140px;
+}
+
+@media (max-width: 767.98px) {
+    .cmmp-profile-photo-preview {
+        min-height: 180px;
+    }
 }
 
 .cmmp-menu-toggle,

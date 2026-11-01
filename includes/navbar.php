@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../helpers/auth.php';
+require_once __DIR__ . '/../helpers/member.php';
+require_once __DIR__ . '/../helpers/account_profile.php';
 require_once __DIR__ . '/../models/Notification.php';
 
 $currentUser = $currentUser ?? authenticated_user();
@@ -10,6 +12,8 @@ $notificationUrl = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR', '
     ? APP_BASE_URL . '/admin/staff/notifications.php'
     : APP_BASE_URL . '/member/notifications/';
 $notificationUnread = Notification::unreadCount((int) ($currentUser['id'] ?? 0));
+$navbarPhotoUrl = current_profile_photo_url((int) ($currentUser['id'] ?? 0));
+$navbarProfileUrl = account_profile_url();
 ?>
 <nav class="navbar navbar-expand-lg cmmp-navbar sticky-top">
 	<div class="container-fluid px-3 px-lg-4">
@@ -35,13 +39,13 @@ $notificationUnread = Notification::unreadCount((int) ($currentUser['id'] ?? 0))
 			<span class="d-none d-md-inline text-muted small"><?= e($currentUser['email'] ?? '') ?></span>
 			<div class="dropdown">
 				<button class="btn cmmp-user-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-					<span class="cmmp-avatar"><i class="fa-solid fa-user"></i></span>
-					<span class="d-none d-sm-inline"><?= e($currentUser['username'] ?? 'Account') ?></span>
+					<span class="cmmp-avatar"><?php if ($navbarPhotoUrl): ?><img src="<?= e($navbarPhotoUrl) ?>" alt=""><?php else: ?><i class="fa-solid fa-user"></i><?php endif; ?></span>
+					<span class="d-none d-sm-inline"><?= e(portal_display_name()) ?></span>
 				</button>
 				<ul class="dropdown-menu dropdown-menu-end shadow-sm">
 					<li><span class="dropdown-item-text small text-muted"><?= e(implode(' / ', $currentRoles)) ?></span></li>
 					<li><hr class="dropdown-divider"></li>
-					<li><a class="dropdown-item" href="<?= e(in_array('MEMBER', $currentRoles, true) && !array_intersect($currentRoles, ['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF', 'PASTOR', 'COUNSELOR', 'MINISTRY_LEADER']) ? APP_BASE_URL . '/member/profile/' : APP_BASE_URL . '/account/profile.php') ?>"><i class="fa-solid fa-user me-2"></i>My profile</a></li>
+					<li><a class="dropdown-item" href="<?= e($navbarProfileUrl) ?>"><i class="fa-solid fa-user me-2"></i>My Profile</a></li>
 					<li><a class="dropdown-item" href="<?= e(APP_BASE_URL) ?>/auth/logout.php"><i class="fa-solid fa-arrow-right-from-bracket me-2"></i>Log out</a></li>
 				</ul>
 			</div>

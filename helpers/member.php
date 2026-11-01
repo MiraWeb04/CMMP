@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../models/Member.php';
 require_once __DIR__ . '/fellowship.php';
+require_once __DIR__ . '/auth.php';
 
 const MEMBER_STATUSES = ['ACTIVE', 'INACTIVE', 'TRANSFERRED', 'DECEASED'];
 const MEMBER_PROFILE_FIELDS = [
@@ -62,6 +63,83 @@ function validate_member_data(array $data, bool $creating, bool $admin): array
     return $errors;
 }
 
+function profile_photo_url(?string $path): ?string
+{
+    $relative = ltrim(str_replace('\\', '/', (string) $path), '/');
+    if ($relative === '' || !str_starts_with($relative, 'uploads/profiles/')) {
+        return null;
+    }
+    $full = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+    if (!is_file($full)) {
+        return null;
+    }
+
+    return APP_BASE_URL . '/profile-image.php?file=' . rawurlencode(basename($relative));
+}
+
+function current_profile_photo_url(?int $userId = null): ?string
+{
+    $userId = $userId ?? current_user_id();
+    if (!$userId) {
+        return null;
+    }
+
+    $query = database()->prepare('SELECT profile_photo FROM members WHERE user_id = :user_id LIMIT 1');
+    $query->execute(['user_id' => $userId]);
+    $path = $query->fetchColumn();
+
+    return $path === false ? null : profile_photo_url((string) $path);
+}
+
+function delete_profile_photo(?string $path): void
+{
+    $relative = ltrim(str_replace('\\', '/', (string) $path), '/');
+    if ($relative === '' || !str_starts_with($relative, 'uploads/profiles/')) {
+        return;
+    }
+
+    $full = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+    if (is_file($full)) {
+        @unlink($full);
+    }
+}
+
+function store_profile_photo(string $tmpPath, int $size, bool $uploaded = false): string
+{
+    if ($size < 1 || $size > APP_UPLOAD_MAX_BYTES || !is_file($tmpPath)) {
+        throw new RuntimeException('Profile photo upload failed or exceeds the size limit.');
+    }
+    if ($uploaded && !is_uploaded_file($tmpPath)) {
+        throw new RuntimeException('Profile photo upload failed or exceeds the size limit.');
+    }
+
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = (string) $finfo->file($tmpPath);
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+    $info = @getimagesize($tmpPath);
+    $imageMime = is_array($info) ? (string) ($info['mime'] ?? '') : '';
+    if (!isset($allowed[$mime]) || $info === false || !isset($allowed[$imageMime]) || $imageMime !== $mime) {
+        throw new RuntimeException('Profile photo must be a valid JPG, PNG, or WebP image.');
+    }
+
+    $directory = APP_UPLOAD_DIRECTORIES['profiles'];
+    if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
+        throw new RuntimeException('Profile photo storage is unavailable.');
+    }
+
+    $filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
+    $destination = $directory . DIRECTORY_SEPARATOR . $filename;
+    $moved = $uploaded
+        ? move_uploaded_file($tmpPath, $destination)
+        : copy($tmpPath, $destination);
+    if (!$moved) {
+        throw new RuntimeException('Profile photo could not be saved.');
+    }
+    @chmod($destination, 0640);
+
+    return 'uploads/profiles/' . $filename;
+}
+
 function upload_member_photo(?array $file): ?string
 {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
@@ -71,21 +149,10 @@ function upload_member_photo(?array $file): ?string
         throw new RuntimeException('Profile photo upload failed or exceeds the size limit.');
     }
 
-    $finfo = new finfo(FILEINFO_MIME_TYPE);
-    $mime = $finfo->file($file['tmp_name']);
-    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    if (!isset($allowed[$mime]) || @getimagesize($file['tmp_name']) === false) {
+    $name = (string) ($file['name'] ?? '');
+    if (preg_match('/\.(php|phtml|phar|exe|js|shtml|cgi|pl|asp|aspx)(\.|$)/i', $name)) {
         throw new RuntimeException('Profile photo must be a valid JPG, PNG, or WebP image.');
     }
 
-    $filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
-    $directory = APP_UPLOAD_DIRECTORIES['profiles'];
-    if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
-        throw new RuntimeException('Profile photo storage is unavailable.');
-    }
-    if (!move_uploaded_file($file['tmp_name'], $directory . DIRECTORY_SEPARATOR . $filename)) {
-        throw new RuntimeException('Profile photo could not be saved.');
-    }
-
-    return 'uploads/profiles/' . $filename;
+    return store_profile_photo((string) ($file['tmp_name'] ?? ''), (int) ($file['size'] ?? 0), true);
 }

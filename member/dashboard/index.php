@@ -39,7 +39,7 @@ $dashboardActions = [
     ['title' => 'Events', 'description' => 'View upcoming church events and register when available.', 'icon' => 'fa-calendar-plus', 'url' => APP_BASE_URL . '/member/events/'],
     ['title' => 'Ministries', 'description' => 'View ministry groups. Administration assigns leaders and members.', 'icon' => 'fa-people-group', 'url' => APP_BASE_URL . '/member/ministries/'],
     ['title' => 'Announcements', 'description' => 'Read important updates about church schedules.', 'icon' => 'fa-bullhorn', 'url' => APP_BASE_URL . '/member/announcements/'],
-    ['title' => 'My profile', 'description' => 'View and update your basic personal information.', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/member/profile/'],
+    ['title' => 'My profile', 'description' => 'View and update your basic personal information.', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php'],
 ];
 $dashboardRecentTitle = 'Recent requests';
 $dashboardRecentEmpty = 'You have not submitted a service or facility request yet.';

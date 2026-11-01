@@ -75,7 +75,7 @@ return [
             ['key' => 'ministries', 'label' => 'Ministries', 'icon' => 'fa-people-group', 'url' => APP_BASE_URL . '/member/ministries/', 'roles' => ['MEMBER']],
             ['key' => 'member-announcements', 'label' => 'Announcements', 'icon' => 'fa-bullhorn', 'url' => APP_BASE_URL . '/member/announcements/', 'roles' => ['MEMBER']],
             ['key' => 'notifications', 'label' => 'Notifications', 'icon' => 'fa-bell', 'url' => APP_BASE_URL . '/member/notifications/', 'roles' => ['MEMBER']],
-            ['key' => 'profile', 'label' => 'Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/member/profile/', 'roles' => ['MEMBER']],
+            ['key' => 'account-profile', 'label' => 'My Profile', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php', 'roles' => ['MEMBER']],
         ],
     ],
     [
