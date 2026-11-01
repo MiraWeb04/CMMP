@@ -12,14 +12,10 @@ function request_is_https(): bool
         return true;
     }
     $forwarded = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
-    return $forwarded === 'https';
-}
-
-function session_cookie_path(): string
-{
-    $path = parse_url((string) APP_BASE_URL, PHP_URL_PATH);
-    $path = is_string($path) ? rtrim($path, '/') : '';
-    return $path !== '' ? $path : '/';
+    if ($forwarded === 'https') {
+        return true;
+    }
+    return str_starts_with((string) APP_BASE_URL, 'https://');
 }
 
 function request_client_ip(): string

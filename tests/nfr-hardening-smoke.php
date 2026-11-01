@@ -147,10 +147,6 @@ try {
     $health = json_decode((string) shell_exec('php ' . escapeshellarg(__DIR__ . '/../health.php')), true);
     assert_true(is_array($health) && in_array($health['status'] ?? '', ['ok', 'degraded'], true), 'Health endpoint returns JSON status');
     assert_true(isset($health['checks']['database']), 'Health endpoint reports database check');
-    $dsns = cmmp_db_dsns(cmmp_db_name());
-    assert_true(in_array('mysql:host=127.0.0.1;port=3306;dbname=cmmp_db;charset=utf8mb4', $dsns, true), 'Database DSN includes 127.0.0.1');
-    assert_true(in_array('mysql:host=localhost;dbname=cmmp_db;charset=utf8mb4', $dsns, true), 'Database DSN includes localhost without a port');
-    assert_true(str_contains(cmmp_db_unavailable_message(new RuntimeException('Connection refused')), 'MySQL said: Connection refused'), 'Database error includes the MySQL reason');
 } catch (Throwable $exception) {
     assert_true(false, 'NFR smoke test crashed: ' . $exception->getMessage());
 }

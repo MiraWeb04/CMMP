@@ -12,11 +12,9 @@ $pageDescription = $pageDescription ?? '';
 $currentUser = $currentUser ?? authenticated_user();
 $currentRoles = $currentRoles ?? current_user_roles();
 
-if (!function_exists('e')) {
-	function e(?string $value): string
-	{
-		return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-	}
+function e(?string $value): string
+{
+	return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 ?>
 <!doctype html>

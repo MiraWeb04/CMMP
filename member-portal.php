@@ -28,8 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
 
         if ($user === null) {
             $errors[] = 'Invalid login credentials.';
-        } elseif (($user['status'] ?? '') === 'LOCKED_TEMPORARY') {
-            $errors[] = 'Too many failed sign-in attempts. Wait 15 minutes and try again, or use Forgot password.';
         } elseif (($user['status'] ?? '') === 'PENDING') {
             $errors[] = 'Your registration is waiting for a church administrator to approve it.';
         } elseif (($user['status'] ?? 'INACTIVE') !== 'ACTIVE') {
@@ -45,39 +43,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'], $_POST[
                 $update = database()->prepare('UPDATE users SET last_login_at = NOW() WHERE id = :id');
                 $update->execute(['id' => (int) $user['id']]);
 
-                header('Location: ' . APP_BASE_URL . role_redirect_path($roles));
+                header('Location: ' . APP_BASE_URL . '/member-portal.php');
                 exit;
             }
         }
     }
 }
 
-try {
-    $currentUser = authenticated_user();
-} catch (Throwable $exception) {
-    error_log('CMMP member portal could not open the current session: ' . $exception->getMessage());
-    $currentUser = null;
-    $errors[] = $exception->getMessage();
-}
+$currentUser = authenticated_user();
 $loggedIn = $currentUser !== null;
 
-if (!function_exists('e')) {
-    function e(?string $value): string
-    {
-        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-    }
+function e(?string $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-try {
-    $events = array_slice(Event::upcoming(0), 0, 3);
-    $announcements = array_slice(Announcement::listForUser(['MEMBER']), 0, 1);
-    $ministries = array_slice(Ministry::listForUser(), 0, 6);
-} catch (Throwable $exception) {
-    error_log('CMMP member portal public content failed: ' . $exception->getMessage());
-    $events = [];
-    $announcements = [];
-    $ministries = [];
-}
+$events = array_slice(Event::upcoming(0), 0, 3);
+$announcements = array_slice(Announcement::listForUser(['MEMBER']), 0, 1);
+$ministries = array_slice(Ministry::listForUser(), 0, 6);
 $featured = $events[0] ?? null;
 $featuredImage = $featured ? event_image_url(isset($featured['event_image']) ? (string) $featured['event_image'] : null) : null;
 $dashboardUrl = $loggedIn ? APP_BASE_URL . role_redirect_path(current_user_roles()) : APP_BASE_URL . '/auth/login.php';

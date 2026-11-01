@@ -18,17 +18,6 @@ function nav_attention_counts(): array
         return $counts;
     }
 
-    try {
-        $counts = nav_attention_counts_build($counts, $userId);
-    } catch (Throwable $exception) {
-        error_log('CMMP navigation counts skipped: ' . $exception->getMessage());
-    }
-
-    return $counts;
-}
-
-function nav_attention_counts_build(array $counts, int $userId): array
-{
     $db = database();
     $unread = Notification::unreadCount($userId);
     nav_count_set($counts, ['notifications', 'staff-notifications', 'admin-notifications'], $unread);
@@ -179,14 +168,9 @@ function nav_count_set(array &$counts, array $keys, int $value): void
 
 function nav_scalar(PDO $db, string $sql, array $params = []): int
 {
-    try {
-        $query = $db->prepare($sql);
-        $query->execute($params);
-        return (int) $query->fetchColumn();
-    } catch (Throwable $exception) {
-        error_log('CMMP navigation count skipped: ' . $exception->getMessage());
-        return 0;
-    }
+    $query = $db->prepare($sql);
+    $query->execute($params);
+    return (int) $query->fetchColumn();
 }
 
 function nav_member_id(PDO $db, int $userId): int

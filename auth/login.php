@@ -18,21 +18,8 @@ if (isset($_GET['logged_out']) && $_GET['logged_out'] === '1') {
     $message = 'You have been logged out successfully.';
 }
 
-$currentUser = null;
-try {
-    $currentUser = authenticated_user();
-} catch (Throwable $exception) {
-    error_log('CMMP login page could not check the current session: ' . $exception->getMessage());
-    $errors[] = $exception->getMessage();
-}
-
-if ($currentUser) {
-    $target = $_GET['redirect'] ?? null;
-    if ($target !== null && $target !== '' && str_starts_with($target, '/')) {
-        header('Location: ' . safe_redirect_target($target));
-    } else {
-        header('Location: ' . APP_BASE_URL . role_redirect_path(current_user_roles()));
-    }
+if (is_logged_in()) {
+    header('Location: ' . $redirect);
     exit;
 }
 
@@ -44,18 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($identifier === '' || $password === '') {
         $errors[] = 'Enter your username or email and password.';
     } else {
-        try {
-            $user = authenticate_user($identifier, $password);
-        } catch (Throwable $exception) {
-            error_log('CMMP login failed before authentication: ' . $exception->getMessage());
-            $errors[] = $exception->getMessage();
-            $user = ['status' => 'DATABASE_UNAVAILABLE'];
-        }
+        $user = authenticate_user($identifier, $password);
 
         if ($user === null) {
             $errors[] = 'Invalid login credentials.';
-        } elseif (($user['status'] ?? '') === 'DATABASE_UNAVAILABLE') {
-            // The database error was already added above.
         } elseif (($user['status'] ?? '') === 'LOCKED_TEMPORARY') {
             $errors[] = 'Too many failed sign-in attempts. Wait 15 minutes and try again, or use Forgot password.';
         } elseif (($user['status'] ?? '') === 'PENDING') {
