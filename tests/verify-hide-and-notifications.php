@@ -393,9 +393,12 @@ try {
             $pdo, $memberUserId, "Unread stay {$suffix}", 'Stay until marked read.',
             'TEST', null, null, null, $createdNotificationIds
         );
-        Notification::deleteForUser($unreadAgainId, $memberUserId);
-        $unreadGone = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $unreadAgainId)->fetchColumn();
-        verify('Unread notifications can be deleted by the owner', $unreadGone === 0);
+        [$blockedUnread, $unreadMessage] = expectException(
+            static fn () => Notification::deleteForUser($unreadAgainId, $memberUserId),
+            'Only read notifications can be deleted'
+        );
+        $unreadStillThere = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $unreadAgainId)->fetchColumn();
+        verify('Unread notifications cannot be deleted by the owner', $blockedUnread && $unreadStillThere === 1, $unreadMessage);
 
         [$blockedForeign, $foreignMessage] = expectException(
             static fn () => Notification::deleteForUser($otherReadId, $memberUserId),
@@ -416,17 +419,28 @@ try {
         verify('Read notification belonging to the user is deleted', $deleted === 0);
         verify('Deleting a notification does not delete the linked service request', $linkedRequest === 1);
 
-        $bulkOne = insertNotification($pdo, $memberUserId, "Bulk one {$suffix}", 'One', 'TEST', null, null, null, $createdNotificationIds);
-        $bulkTwo = insertNotification($pdo, $memberUserId, "Bulk two {$suffix}", 'Two', 'TEST', null, null, null, $createdNotificationIds);
+        $bulkOne = insertNotification($pdo, $memberUserId, "Bulk one {$suffix}", 'One', 'TEST', date('Y-m-d H:i:s'), null, null, $createdNotificationIds);
+        $bulkTwo = insertNotification($pdo, $memberUserId, "Bulk two {$suffix}", 'Two', 'TEST', date('Y-m-d H:i:s'), null, null, $createdNotificationIds);
+        $bulkUnread = insertNotification($pdo, $memberUserId, "Bulk unread {$suffix}", 'Stay', 'TEST', null, null, null, $createdNotificationIds);
+        [$blockedBulkUnread] = expectException(
+            static fn () => Notification::deleteManyForUser([$bulkOne, $bulkUnread], $memberUserId),
+            'Only read notifications can be deleted'
+        );
+        verify('Delete selected rejects unread notifications', $blockedBulkUnread);
         $bulkCount = Notification::deleteManyForUser([$bulkOne, $bulkTwo, $otherReadId], $memberUserId);
         $otherAfterBulk = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $otherReadId)->fetchColumn();
-        verify('Delete selected removes only the current user\'s notifications', $bulkCount === 2 && $otherAfterBulk === 1);
+        verify('Delete selected removes only the current user\'s read notifications', $bulkCount === 2 && $otherAfterBulk === 1);
 
-        insertNotification($pdo, $memberUserId, "Clear {$suffix}", 'Gone', 'TEST', null, null, null, $createdNotificationIds);
+        insertNotification($pdo, $memberUserId, "Clear {$suffix}", 'Gone', 'TEST', date('Y-m-d H:i:s'), null, null, $createdNotificationIds);
+        $unreadKept = insertNotification($pdo, $memberUserId, "Clear unread {$suffix}", 'Keep', 'TEST', null, null, null, $createdNotificationIds);
         Notification::deleteAllForUser($memberUserId);
-        $memberLeft = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE user_id = ' . $memberUserId)->fetchColumn();
+        $memberReadLeft = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE user_id = ' . $memberUserId . ' AND read_at IS NOT NULL')->fetchColumn();
+        $unreadKeptCount = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $unreadKept)->fetchColumn();
         $otherAfterAll = (int) $pdo->query('SELECT COUNT(*) FROM notifications WHERE id = ' . $otherReadId)->fetchColumn();
-        verify('Delete all empties only the current user\'s inbox', $memberLeft === 0 && $otherAfterAll === 1);
+        verify(
+            'Delete all removes only the current user\'s read notifications',
+            $memberReadLeft === 0 && $unreadKeptCount === 1 && $otherAfterAll === 1
+        );
 
         $searchItems = Notification::filtered($memberUserId, ['q' => $suffix, 'status' => 'all', 'type' => '', 'since' => '']);
         verify(
@@ -457,8 +471,8 @@ try {
             is_string($inboxView)
             && str_contains($inboxView, 'Select all')
             && str_contains($inboxView, 'name="ids[]"')
-            && str_contains($inboxView, 'Delete selected')
-            && str_contains($inboxView, 'Delete all')
+            && str_contains($inboxView, 'Delete selected read')
+            && str_contains($inboxView, 'Delete all read')
             && str_contains($inboxView, 'Mark read')
         );
     }

@@ -13,9 +13,32 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 require_valid_csrf_token();
 $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+$action = (string) ($_POST['action'] ?? 'deactivate');
 $person = $id ? Personnel::find((int) $id) : null;
-if ($person && !Personnel::isClergy($person)) {
-    Personnel::deactivate((int) $id);
+if (!$person) {
+    http_response_code(404);
+    exit('Personnel record not found.');
 }
-header('Location: index.php?deactivated=1');
-exit;
+
+$type = (string) ($person['personnel_type'] ?? 'STAFF');
+$redirect = match ($type) {
+    'PASTOR' => '../pastors/index.php',
+    'COUNSELOR' => '../counselors/index.php',
+    default => 'index.php',
+};
+$statusFilter = trim((string) ($_POST['status_filter'] ?? ''));
+$query = $statusFilter !== '' ? '&status=' . urlencode($statusFilter) : '';
+
+try {
+    if ($action === 'reactivate') {
+        Personnel::reactivate((int) $id, current_user_id());
+        header('Location: ' . $redirect . '?reactivated=1' . $query);
+        exit;
+    }
+    Personnel::deactivate((int) $id, current_user_id());
+    header('Location: ' . $redirect . '?deactivated=1' . $query);
+    exit;
+} catch (InvalidArgumentException $exception) {
+    header('Location: ' . $redirect . '?error=' . urlencode($exception->getMessage()) . $query);
+    exit;
+}

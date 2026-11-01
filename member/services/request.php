@@ -121,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($errors === []) {
         try {
+            Member::assertCanCreateRequests($memberId);
             ServiceRequest::create([
                 'service_type_id' => (int) $selected['id'],
                 'requested_by_member_id' => $memberId,

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/AuditLog.php';
 
 final class Facility
 {
@@ -130,9 +131,23 @@ final class Facility
         $query->execute($data);
     }
 
-    public static function setStatus(int $id, string $status): void
+    public static function setStatus(int $id, string $status, ?int $userId = null): void
     {
+        if (!in_array($status, ['AVAILABLE', 'UNAVAILABLE', 'MAINTENANCE'], true)) {
+            throw new InvalidArgumentException('Invalid facility status.');
+        }
+        $facility = self::find($id);
+        if (!$facility) {
+            throw new InvalidArgumentException('Facility not found.');
+        }
         $query = database()->prepare('UPDATE facilities SET facility_status = :status WHERE id = :id');
         $query->execute(['status' => $status, 'id' => $id]);
+        AuditLog::record(
+            $userId,
+            $status === 'AVAILABLE' ? 'FACILITY_REACTIVATED' : 'FACILITY_DEACTIVATED',
+            'FACILITY',
+            $id,
+            ['status' => $status]
+        );
     }
 }

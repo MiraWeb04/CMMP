@@ -10,7 +10,11 @@ require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 
 $page = list_page();
 $perPage = list_per_page();
-$result = Personnel::paginate('COUNSELOR', $page, $perPage);
+$status = strtoupper(trim((string) ($_GET['status'] ?? 'ACTIVE')));
+if (!in_array($status, ['ACTIVE', 'INACTIVE', 'ON_LEAVE', 'ALL'], true)) {
+	$status = 'ACTIVE';
+}
+$result = Personnel::paginate('COUNSELOR', $page, $perPage, $status);
 $people = $result['items'];
 $details = [];
 foreach ($people as $person) {
@@ -63,14 +67,29 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 	<a class="btn btn-primary" href="add.php"><i class="fa-solid fa-user-plus me-2"></i>Add counselor</a>
 </div>
 <?php if (isset($_GET['saved'])): ?><div class="alert alert-success">Counselor record created successfully.</div><?php endif; ?>
-<?php if (isset($_GET['deactivated'])): ?><div class="alert alert-success">Counselor record deactivated.</div><?php endif; ?>
+<?php if (isset($_GET['deactivated'])): ?><div class="alert alert-success">Counselor record deactivated. Historical assignments were kept.</div><?php endif; ?>
+<?php if (isset($_GET['reactivated'])): ?><div class="alert alert-success">Counselor record reactivated.</div><?php endif; ?>
+<?php if (!empty($_GET['error'])): ?><div class="alert alert-danger"><?= e((string) $_GET['error']) ?></div><?php endif; ?>
 <?php if ($errors !== []): ?><div class="alert alert-danger"><ul class="mb-0"><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+<div class="cmmp-card mb-4">
+	<form method="get" class="row g-3 align-items-end">
+		<div class="col-md-4">
+			<label class="form-label" for="status">Employment status</label>
+			<select class="form-select" id="status" name="status">
+				<?php foreach (['ACTIVE' => 'Active', 'INACTIVE' => 'Inactive', 'ON_LEAVE' => 'On leave', 'ALL' => 'All records'] as $value => $label): ?>
+					<option value="<?= e($value) ?>" <?= $status === $value ? 'selected' : '' ?>><?= e($label) ?></option>
+				<?php endforeach; ?>
+			</select>
+		</div>
+		<div class="col-auto"><button class="btn btn-primary" type="submit">Filter</button><a class="btn btn-outline-secondary" href="index.php">Reset</a></div>
+	</form>
+</div>
 <div class="cmmp-table-wrap">
 	<div class="table-responsive">
 		<table class="table table-hover align-middle mb-0">
-			<thead><tr><th>Name</th><th>Portal email</th><th>Employee number</th><th>Position</th><th>Specialization</th><th>Credentials</th><th class="text-end">Actions</th></tr></thead>
+			<thead><tr><th>Name</th><th>Portal email</th><th>Employee number</th><th>Position</th><th>Specialization</th><th>Credentials</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
 			<tbody>
-			<?php if ($people === []): ?><tr><td colspan="7" class="text-center text-muted py-5"><i class="fa-solid fa-comments d-block fs-2 mb-3"></i><strong class="d-block">No active counselors found</strong><span>Create a counselor record to make it available for service assignments.</span></td></tr><?php endif; ?>
+			<?php if ($people === []): ?><tr><td colspan="8" class="text-center text-muted py-5"><i class="fa-solid fa-comments d-block fs-2 mb-3"></i><strong class="d-block">No counselor records found</strong><span>Create a counselor record to make it available for service assignments.</span></td></tr><?php endif; ?>
 			<?php foreach ($people as $person): ?>
 				<tr>
 					<td><?= e($person['display_name']) ?></td>
@@ -79,14 +98,21 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 					<td><?= e($person['position_title']) ?></td>
 					<td><?= e($person['specialization'] ?? 'Not set') ?></td>
 					<td><?= e($person['credentials'] ?? 'Not set') ?></td>
+					<td><span class="badge text-bg-<?= $person['employment_status'] === 'ACTIVE' ? 'success' : 'secondary' ?>"><?= e($person['employment_status']) ?></span></td>
 					<td class="text-end"><div class="cmmp-row-actions">
 						<button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#viewCounselor<?= (int) $person['id'] ?>">View</button>
 						<button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#editCounselor<?= (int) $person['id'] ?>">Edit</button>
 						<a class="btn btn-sm btn-outline-primary" href="assignments.php?id=<?= (int) $person['id'] ?>">Assignments</a>
 						<a class="btn btn-sm btn-outline-primary" href="schedule.php?id=<?= (int) $person['id'] ?>">Schedule</a>
-						<form method="post" action="../staff/deactivate.php" class="d-inline" onsubmit="return confirm('Deactivate this counselor record?');">
-							<?= csrf_field() ?><input type="hidden" name="id" value="<?= (int) $person['id'] ?>"><button class="btn btn-sm btn-outline-danger" type="submit">Deactivate</button>
+						<?php if ($person['employment_status'] === 'ACTIVE'): ?>
+						<form method="post" action="../staff/deactivate.php" class="d-inline" onsubmit="return confirm('Deactivate this counselor record? They will not receive new assignments. Historical records stay in place.');">
+							<?= csrf_field() ?><input type="hidden" name="id" value="<?= (int) $person['id'] ?>"><input type="hidden" name="action" value="deactivate"><input type="hidden" name="status_filter" value="<?= e($status) ?>"><button class="btn btn-sm btn-outline-danger" type="submit">Deactivate</button>
 						</form>
+						<?php else: ?>
+						<form method="post" action="../staff/deactivate.php" class="d-inline" onsubmit="return confirm('Reactivate this counselor record?');">
+							<?= csrf_field() ?><input type="hidden" name="id" value="<?= (int) $person['id'] ?>"><input type="hidden" name="action" value="reactivate"><input type="hidden" name="status_filter" value="<?= e($status) ?>"><button class="btn btn-sm btn-outline-success" type="submit">Reactivate</button>
+						</form>
+						<?php endif; ?>
 					</div></td>
 				</tr>
 			<?php endforeach; ?>
@@ -102,7 +128,7 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 $paginationTotal = $result['total'];
 $paginationPage = $page;
 $paginationPerPage = $perPage;
-$paginationFilters = [];
+$paginationFilters = ['status' => $status];
 $paginationLabel = 'Counselor pages';
 require __DIR__ . '/../../includes/pagination.php';
 require __DIR__ . '/../../includes/footer.php';

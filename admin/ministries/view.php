@@ -62,8 +62,20 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         <h1><?= e($ministry['name']) ?></h1>
         <p><?= e($ministry['code']) ?> · Leader: <?= e($ministry['leader_name']) ?></p>
     </div>
-    <a class="btn btn-outline-secondary" href="edit.php?id=<?= (int) $id ?>">Assign leader</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="edit.php?id=<?= (int) $id ?>">Assign leader</a>
+        <form method="post" action="status.php" class="d-inline" onsubmit="return confirm(<?= $ministry['ministry_status'] === 'ACTIVE' ? json_encode('Deactivate this ministry? Members and events stay on file.') : json_encode('Reactivate this ministry?') ?>);">
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= (int) $id ?>">
+            <input type="hidden" name="status" value="<?= $ministry['ministry_status'] === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE' ?>">
+            <button class="btn <?= $ministry['ministry_status'] === 'ACTIVE' ? 'btn-outline-danger' : 'btn-outline-success' ?>" type="submit">
+                <?= $ministry['ministry_status'] === 'ACTIVE' ? 'Deactivate ministry' : 'Reactivate ministry' ?>
+            </button>
+        </form>
+    </div>
 </div>
+<?php if (isset($_GET['status_changed'])): ?><div class="alert alert-success">Ministry status updated. Historical membership and events were kept.</div><?php endif; ?>
+<?php if (!empty($_GET['error'])): ?><div class="alert alert-danger"><?= e((string) $_GET['error']) ?></div><?php endif; ?>
 <div class="row g-3">
     <div class="col-lg-8">
         <div class="cmmp-card">

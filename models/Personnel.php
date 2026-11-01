@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/AuditLog.php';
 
 final class Personnel
 {
@@ -175,10 +176,57 @@ final class Personnel
         }
     }
 
-    public static function deactivate(int $id): void
+    public static function deactivate(int $id, ?int $userId = null): void
     {
-        $query = database()->prepare("UPDATE staff SET employment_status = 'INACTIVE' WHERE id = :id");
-        $query->execute(['id' => $id]);
+        self::setEmploymentStatus($id, 'INACTIVE', $userId);
+    }
+
+    public static function reactivate(int $id, ?int $userId = null): void
+    {
+        self::setEmploymentStatus($id, 'ACTIVE', $userId);
+    }
+
+    public static function setEmploymentStatus(int $id, string $status, ?int $userId = null): void
+    {
+        if (!in_array($status, ['ACTIVE', 'INACTIVE', 'ON_LEAVE'], true)) {
+            throw new InvalidArgumentException('Invalid employment status.');
+        }
+        $person = self::find($id);
+        if (!$person) {
+            throw new InvalidArgumentException('Personnel record not found.');
+        }
+
+        $query = database()->prepare('UPDATE staff SET employment_status = :status WHERE id = :id');
+        $query->execute(['status' => $status, 'id' => $id]);
+        AuditLog::record(
+            $userId,
+            $status === 'ACTIVE' ? 'PERSONNEL_REACTIVATED' : 'PERSONNEL_DEACTIVATED',
+            'STAFF',
+            $id,
+            ['status' => $status, 'type' => (string) ($person['personnel_type'] ?? 'STAFF')]
+        );
+    }
+
+    public static function assertAssignable(int $staffId): array
+    {
+        $person = self::find($staffId);
+        if (!$person) {
+            throw new InvalidArgumentException('Personnel record not found.');
+        }
+        if (($person['employment_status'] ?? '') !== 'ACTIVE') {
+            throw new InvalidArgumentException('Inactive personnel cannot receive new assignments.');
+        }
+        $userId = filter_var($person['user_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+        if ($userId) {
+            $user = database()->prepare('SELECT status FROM users WHERE id = :id LIMIT 1');
+            $user->execute(['id' => $userId]);
+            $userStatus = $user->fetchColumn();
+            if ($userStatus !== false && (string) $userStatus !== 'ACTIVE') {
+                throw new InvalidArgumentException('Inactive personnel cannot receive new assignments.');
+            }
+        }
+
+        return $person;
     }
 
     public static function isClergy(array $person): bool
@@ -212,10 +260,19 @@ final class Personnel
         return self::paginate($type, 1, 500)['items'];
     }
 
-    public static function paginate(string $type, int $page, int $perPage): array
+    public static function paginate(string $type, int $page, int $perPage, string $status = 'ACTIVE'): array
     {
         $typeFilter = '';
-        $where = "s.employment_status = 'ACTIVE'";
+        $params = [];
+        $where = '1=1';
+        $status = strtoupper(trim($status));
+        if ($status !== '' && $status !== 'ALL') {
+            if (!in_array($status, ['ACTIVE', 'INACTIVE', 'ON_LEAVE'], true)) {
+                $status = 'ACTIVE';
+            }
+            $where = 's.employment_status = :status';
+            $params['status'] = $status;
+        }
 
         if ($type === 'PASTOR') {
             $typeFilter = ' AND p.id IS NOT NULL';
@@ -231,15 +288,23 @@ final class Personnel
              LEFT JOIN pastors p ON p.staff_id = s.id
              LEFT JOIN counselors c ON c.staff_id = s.id
              WHERE ' . $where . $typeFilter;
-        $total = (int) database()->query('SELECT COUNT(*)' . $from)->fetchColumn();
+        $count = database()->prepare('SELECT COUNT(*)' . $from);
+        $count->execute($params);
+        $total = (int) $count->fetchColumn();
         $offset = ($page - 1) * $perPage;
-        $query = database()->query(
+        $query = database()->prepare(
                 'SELECT s.id, s.employee_number, s.position_title, s.employment_status, s.hired_at,
                     p.ordination_date, c.specialization, c.credentials, u.email,
                     COALESCE(CONCAT(m.first_name, " ", m.last_name), u.username, s.employee_number) AS display_name,
                     CASE WHEN p.id IS NOT NULL THEN "PASTOR" WHEN c.id IS NOT NULL THEN "COUNSELOR" ELSE "STAFF" END AS personnel_type
-             ' . $from . ' ORDER BY display_name LIMIT ' . (int) $perPage . ' OFFSET ' . (int) $offset
+             ' . $from . ' ORDER BY display_name LIMIT :limit OFFSET :offset'
         );
+        foreach ($params as $key => $value) {
+            $query->bindValue(':' . $key, $value, PDO::PARAM_STR);
+        }
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $query->execute();
         return ['items' => $query->fetchAll(), 'total' => $total];
     }
 
@@ -289,6 +354,7 @@ final class Personnel
 
     public static function saveEventAssignment(int $eventId, int $staffId, string $role): void
     {
+        self::assertAssignable($staffId);
         $query = database()->prepare(
             'INSERT INTO event_assignments (event_id, staff_id, assignment_role)
              VALUES (:event_id, :staff_id, :assignment_role)

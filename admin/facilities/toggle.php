@@ -11,6 +11,10 @@ require_valid_csrf_token();
 $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 $facility = $id ? Facility::find($id) : null;
 if (!$facility) { http_response_code(404); exit('Facility not found.'); }
-Facility::setStatus((int) $facility['id'], $facility['facility_status'] === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE');
+Facility::setStatus(
+    (int) $facility['id'],
+    $facility['facility_status'] === 'AVAILABLE' ? 'UNAVAILABLE' : 'AVAILABLE',
+    current_user_id()
+);
 header('Location: view.php?id=' . (int) $facility['id'] . '&status_changed=1');
 exit;

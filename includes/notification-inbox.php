@@ -31,11 +31,11 @@ $filterFields = static function () use ($filters): void {
             </form>
         <?php endif; ?>
         <?php if ($total > 0): ?>
-            <form method="post" onsubmit="return confirm('Delete all of your notifications? This cannot be undone. Related church records will not be deleted.');">
+            <form method="post" onsubmit="return confirm('Delete all of your read notifications? Unread notices stay. Related church records will not be deleted.');">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete_all">
                 <?php $filterFields(); ?>
-                <button class="btn btn-outline-danger" type="submit">Delete all</button>
+                <button class="btn btn-outline-danger" type="submit">Delete all read</button>
             </form>
         <?php endif; ?>
     </div>
@@ -76,7 +76,10 @@ $filterFields = static function () use ($filters): void {
     <div class="alert alert-success">The selected notifications were deleted. Related church records were not changed.</div>
 <?php endif; ?>
 <?php if (isset($_GET['deleted_all'])): ?>
-    <div class="alert alert-success">All of your notifications were deleted. Related church records were not changed.</div>
+    <div class="alert alert-success">Your read notifications were deleted. Unread notices and related church records were not changed.</div>
+<?php endif; ?>
+<?php if (isset($_GET['none_read'])): ?>
+    <div class="alert alert-warning">There were no read notifications to delete.</div>
 <?php endif; ?>
 <?php if (!empty($_GET['delete_error'])): ?>
     <div class="alert alert-danger"><?= e((string) $_GET['delete_error']) ?></div>
@@ -91,7 +94,7 @@ $filterFields = static function () use ($filters): void {
             <input type="checkbox" data-cmmp-select-all>
             <span>Select all</span>
         </label>
-        <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="delete_selected" onclick="return confirm('Delete the selected notifications? Related church records will not be deleted.');">Delete selected</button>
+        <button class="btn btn-sm btn-outline-danger" type="submit" name="action" value="delete_selected" onclick="return confirm('Delete the selected read notifications? Unread notices cannot be deleted. Related church records will not be deleted.');">Delete selected read</button>
     </div>
     <div class="cmmp-note-list">
         <?php foreach ($items as $item): ?>
@@ -122,8 +125,9 @@ $filterFields = static function () use ($filters): void {
                 <div class="cmmp-note-actions">
                     <?php if ($isUnread): ?>
                         <button class="btn btn-sm btn-outline-primary" type="submit" name="mark_read" value="<?= (int) $item['id'] ?>">Mark read</button>
+                    <?php else: ?>
+                        <button class="btn btn-sm btn-outline-danger" type="submit" name="delete_one" value="<?= (int) $item['id'] ?>" onclick="return confirm('Delete this notification? Related service requests, appointments, and events will not be deleted.');">Delete</button>
                     <?php endif; ?>
-                    <button class="btn btn-sm btn-outline-danger" type="submit" name="delete_one" value="<?= (int) $item['id'] ?>" onclick="return confirm('Delete this notification? Related service requests, appointments, and events will not be deleted.');">Delete</button>
                 </div>
             </article>
         <?php endforeach; ?>

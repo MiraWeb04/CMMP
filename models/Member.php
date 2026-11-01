@@ -204,9 +204,39 @@ final class Member
         AuditLog::record(null, 'MEMBER_UPDATED', 'MEMBER', $id);
     }
 
-    public static function setStatus(int $id, string $status): void
+    public static function setStatus(int $id, string $status, ?int $userId = null): void
     {
+        if (!in_array($status, ['ACTIVE', 'INACTIVE', 'TRANSFERRED', 'DECEASED'], true)) {
+            throw new InvalidArgumentException('Invalid membership status.');
+        }
+        $member = self::find($id);
+        if (!$member) {
+            throw new InvalidArgumentException('Member not found.');
+        }
         $query = database()->prepare('UPDATE members SET membership_status = :status WHERE id = :id');
         $query->execute(['id' => $id, 'status' => $status]);
+        AuditLog::record(
+            $userId,
+            $status === 'ACTIVE' ? 'MEMBER_REACTIVATED' : 'MEMBER_DEACTIVATED',
+            'MEMBER',
+            $id,
+            ['status' => $status]
+        );
+    }
+
+    public static function assertActive(int $memberId, string $message = 'Inactive members cannot perform this action.'): void
+    {
+        $member = self::find($memberId);
+        if (!$member) {
+            throw new InvalidArgumentException('Member not found.');
+        }
+        if (($member['membership_status'] ?? '') !== 'ACTIVE') {
+            throw new InvalidArgumentException($message);
+        }
+    }
+
+    public static function assertCanCreateRequests(int $memberId): void
+    {
+        self::assertActive($memberId, 'Inactive members cannot submit new service requests.');
     }
 }

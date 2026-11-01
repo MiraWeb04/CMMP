@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'description' => trim((string) ($_POST['description'] ?? '')),
             'leader_staff_id' => $leaderStaffId,
         ]);
-        Ministry::setStatus($id, (string) ($_POST['ministry_status'] ?? 'ACTIVE'));
+        Ministry::setStatus($id, (string) ($_POST['ministry_status'] ?? 'ACTIVE'), current_user_id());
         foreach ($postedMembers['selected'] as $memberId => $role) {
             Ministry::addMember($id, (int) $memberId, $role);
         }

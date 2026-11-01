@@ -69,15 +69,25 @@ final class Notification
         return $notification ?: null;
     }
 
-    public static function deleteForUser(int $id, int $userId): void
+    public static function assertOwnedRead(int $id, int $userId): array
     {
         $notification = self::findForUser($id, $userId);
         if (!$notification) {
             throw new InvalidArgumentException('Notification not found.');
         }
+        if (empty($notification['read_at'])) {
+            throw new InvalidArgumentException('Only read notifications can be deleted.');
+        }
+
+        return $notification;
+    }
+
+    public static function deleteForUser(int $id, int $userId): void
+    {
+        self::assertOwnedRead($id, $userId);
 
         $delete = database()->prepare(
-            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id'
+            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id AND read_at IS NOT NULL'
         );
         $delete->execute(['id' => $id, 'user_id' => $userId]);
         if ($delete->rowCount() !== 1) {
@@ -95,11 +105,21 @@ final class Notification
             throw new InvalidArgumentException('Select at least one notification to delete.');
         }
 
+        foreach ($ids as $id) {
+            $owned = self::findForUser($id, $userId);
+            if (!$owned) {
+                continue;
+            }
+            if (empty($owned['read_at'])) {
+                throw new InvalidArgumentException('Only read notifications can be deleted.');
+            }
+        }
+
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
         $parameters = $ids;
         $parameters[] = $userId;
         $delete = database()->prepare(
-            "DELETE FROM notifications WHERE id IN ($placeholders) AND user_id = ?"
+            "DELETE FROM notifications WHERE id IN ($placeholders) AND user_id = ? AND read_at IS NOT NULL"
         );
         $delete->execute($parameters);
         $deleted = $delete->rowCount();
@@ -112,7 +132,9 @@ final class Notification
 
     public static function deleteAllForUser(int $userId): int
     {
-        $delete = database()->prepare('DELETE FROM notifications WHERE user_id = :user_id');
+        $delete = database()->prepare(
+            'DELETE FROM notifications WHERE user_id = :user_id AND read_at IS NOT NULL'
+        );
         $delete->execute(['user_id' => $userId]);
 
         return $delete->rowCount();

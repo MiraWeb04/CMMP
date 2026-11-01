@@ -5,6 +5,8 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/Notification.php';
 require_once __DIR__ . '/ChurchCalendar.php';
 require_once __DIR__ . '/Personnel.php';
+require_once __DIR__ . '/AuditLog.php';
+require_once __DIR__ . '/Member.php';
 
 final class Event
 {
@@ -142,6 +144,7 @@ final class Event
 
     public static function syncPastorAssignment(int $eventId, int $staffId): void
     {
+        Personnel::assertAssignable($staffId);
         database()->prepare('DELETE ea FROM event_assignments ea INNER JOIN pastors p ON p.staff_id = ea.staff_id WHERE ea.event_id = :event_id')
             ->execute(['event_id' => $eventId]);
         Personnel::saveEventAssignment($eventId, $staffId, 'Pastor');
@@ -260,6 +263,7 @@ final class Event
             $query = $connection->prepare('UPDATE events SET event_status = :status WHERE id = :id');
             $query->execute(['status' => $status, 'id' => $id]);
             $connection->commit();
+            AuditLog::record(null, 'EVENT_STATUS_UPDATED', 'EVENT', $id, ['status' => $status]);
         } catch (Throwable $exception) {
             if ($connection->inTransaction()) { $connection->rollBack(); }
             throw $exception;
@@ -268,6 +272,7 @@ final class Event
 
     public static function register(int $eventId, int $memberId): void
     {
+        Member::assertActive($memberId, 'Inactive members cannot register for events.');
         $connection = database();
         $connection->beginTransaction();
         try {
