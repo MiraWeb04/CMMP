@@ -16,7 +16,7 @@ if (!$ministry) {
 }
 
 $assignedIds = array_map('intval', array_column($ministry['members'], 'member_id'));
-$members = Ministry::activeMembersWithMinistries($id);
+$members = Ministry::membersEligibleForAssignment($id);
 $availableMembers = array_values(array_filter(
     $members,
     static fn(array $member): bool => !in_array((int) $member['id'], $assignedIds, true)

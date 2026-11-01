@@ -1,9 +1,13 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../services/NotificationService.php';
 final class Notification
 {
-    public static function create(int $userId,string $title,string $message,string $type,?string $referenceType=null,?int $referenceId=null): void { database()->prepare('INSERT INTO notifications (user_id,title,message,notification_type,reference_type,reference_id) VALUES (:user_id,:title,:message,:type,:reference_type,:reference_id)')->execute(['user_id'=>$userId,'title'=>$title,'message'=>$message,'type'=>$type,'reference_type'=>$referenceType,'reference_id'=>$referenceId]); }
+    public static function create(int $userId,string $title,string $message,string $type,?string $referenceType=null,?int $referenceId=null): void
+    {
+        NotificationService::notifyUser($userId, $title, $message, $type ?: 'GENERIC', $referenceType, $referenceId);
+    }
     public static function forUser(int $userId): array { $q=database()->prepare('SELECT * FROM notifications WHERE user_id=:user_id ORDER BY created_at DESC');$q->execute(['user_id'=>$userId]);return $q->fetchAll(); }
 
     public static function filtered(int $userId, array $filters): array
@@ -23,8 +27,10 @@ final class Notification
         }
         $search = trim((string) ($filters['q'] ?? ''));
         if ($search !== '') {
-            $where[] = '(title LIKE :search OR message LIKE :search)';
-            $params['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $where[] = '(title LIKE :search_title OR message LIKE :search_message)';
+            $params['search_title'] = $term;
+            $params['search_message'] = $term;
         }
         $since = (string) ($filters['since'] ?? '');
         if ($since !== '') {
@@ -51,6 +57,79 @@ final class Notification
     }
 
     public static function markRead(int $id,int $userId): void { database()->prepare('UPDATE notifications SET read_at=COALESCE(read_at,NOW()) WHERE id=:id AND user_id=:user_id')->execute(['id'=>$id,'user_id'=>$userId]); }
+
+    public static function findForUser(int $id, int $userId): ?array
+    {
+        $query = database()->prepare(
+            'SELECT * FROM notifications WHERE id = :id AND user_id = :user_id LIMIT 1'
+        );
+        $query->execute(['id' => $id, 'user_id' => $userId]);
+        $notification = $query->fetch();
+
+        return $notification ?: null;
+    }
+
+    public static function deleteForUser(int $id, int $userId): void
+    {
+        $notification = self::findForUser($id, $userId);
+        if (!$notification) {
+            throw new InvalidArgumentException('Notification not found.');
+        }
+
+        $delete = database()->prepare(
+            'DELETE FROM notifications WHERE id = :id AND user_id = :user_id'
+        );
+        $delete->execute(['id' => $id, 'user_id' => $userId]);
+        if ($delete->rowCount() !== 1) {
+            throw new RuntimeException('The notification could not be deleted.');
+        }
+    }
+
+    public static function deleteManyForUser(array $ids, int $userId): int
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $ids),
+            static fn (int $id): bool => $id > 0
+        )));
+        if ($ids === []) {
+            throw new InvalidArgumentException('Select at least one notification to delete.');
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $parameters = $ids;
+        $parameters[] = $userId;
+        $delete = database()->prepare(
+            "DELETE FROM notifications WHERE id IN ($placeholders) AND user_id = ?"
+        );
+        $delete->execute($parameters);
+        $deleted = $delete->rowCount();
+        if ($deleted < 1) {
+            throw new InvalidArgumentException('Notification not found.');
+        }
+
+        return $deleted;
+    }
+
+    public static function deleteAllForUser(int $userId): int
+    {
+        $delete = database()->prepare('DELETE FROM notifications WHERE user_id = :user_id');
+        $delete->execute(['user_id' => $userId]);
+
+        return $delete->rowCount();
+    }
+
+    public static function countForUser(int $userId): int
+    {
+        $query = database()->prepare('SELECT COUNT(*) FROM notifications WHERE user_id = :user_id');
+        $query->execute(['user_id' => $userId]);
+
+        return (int) $query->fetchColumn();
+    }
+
+    public static function deleteReadForUser(int $id, int $userId): void
+    {
+        self::deleteForUser($id, $userId);
+    }
 
     public static function markAllRead(int $userId): void
     {

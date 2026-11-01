@@ -3,11 +3,16 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/pagination.php';
 require_once __DIR__ . '/../../models/Personnel.php';
 
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 
-$people = Personnel::list('STAFF');
+$page = list_page();
+$perPage = list_per_page();
+$result = Personnel::paginate('STAFF', $page, $perPage);
+$people = $result['items'];
+$page = min($page, pagination_total_pages($result['total'], $perPage));
 $pageTitle = 'Staff';
 $activeNav = 'staff';
 $bodyClass = 'cmmp-glass';
@@ -75,4 +80,12 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 		</table>
 	</div>
 </div>
-<?php require __DIR__ . '/../../includes/footer.php'; ?>
+<?php
+$paginationTotal = $result['total'];
+$paginationPage = $page;
+$paginationPerPage = $perPage;
+$paginationFilters = [];
+$paginationLabel = 'Staff pages';
+require __DIR__ . '/../../includes/pagination.php';
+require __DIR__ . '/../../includes/footer.php';
+?>

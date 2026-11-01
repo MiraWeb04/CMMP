@@ -5,7 +5,7 @@ require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
 require_once __DIR__ . '/../../models/ServiceRequest.php';
 
-require_role(SERVICE_REVIEW_ROLES);
+require_role(SERVICE_CALENDAR_ROLES);
 $facilities = ServiceRequest::facilities();
 $selectedFacilityId = filter_input(INPUT_GET, 'facility_id', FILTER_VALIDATE_INT) ?: null;
 $pageTitle = 'Church calendar';
@@ -33,51 +33,16 @@ require __DIR__ . '/../../includes/breadcrumb.php';
             <?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= $selectedFacilityId === (int) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name']) ?></option><?php endforeach; ?>
         </select>
     </div>
-    <div class="cmmp-calendar-legend" aria-label="Calendar legend">
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-available"></i>Available</span>
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-pending"></i>Pending request</span>
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-blocked"></i>Booked</span>
-        <span><i class="cmmp-calendar-dot cmmp-calendar-dot-today"></i>Today</span>
-    </div>
 </div>
-<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Pending, approved, and scheduled requests are shown so the secretary and pastor can check conflicts before approving a request.</span></div>
-<div class="cmmp-calendar-shell"><div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div></div>
+<div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open. Red days already have confirmed church bookings. See <code>docs/scheduling-rules.md</code> in the repository for conflict rules.</span></div>
+<div class="cmmp-calendar-shell">
+    <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
+    <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>
+</div>
 <div id="calendar-message" class="alert alert-danger mt-3" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="<?= e(APP_BASE_URL) ?>/assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
 <script>
-(() => {
-    const element = document.getElementById('church-calendar');
-    const facility = document.getElementById('calendar-facility');
-    const message = document.getElementById('calendar-message');
-    if (!element || !window.FullCalendar) return;
-
-    const calendar = new FullCalendar.Calendar(element, {
-        initialView: window.innerWidth < 768 ? 'listMonth' : 'dayGridMonth',
-        height: 'auto',
-        fixedWeekCount: false,
-        dayMaxEvents: 3,
-        firstDay: 0,
-        headerToolbar: {left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth'},
-        events: (info, success, failure) => {
-            const query = new URLSearchParams({start: info.startStr, end: info.endStr});
-            if (facility.value) query.set('facility_id', facility.value);
-            fetch(element.dataset.apiUrl + '?' + query.toString(), {headers: {Accept: 'application/json'}})
-                .then((response) => response.json().then((data) => ({response, data})))
-                .then(({response, data}) => {
-                    if (!response.ok || !data.success) throw new Error(data.message || 'Calendar data could not be loaded.');
-                    success(data.events || []);
-                    message.hidden = true;
-                })
-                .catch((error) => { message.textContent = error.message; message.hidden = false; failure(error); });
-        },
-        eventClick: (info) => {
-            info.jsEvent.preventDefault();
-            const details = info.event.extendedProps;
-            alert(details.type + ': ' + info.event.title.replace(details.type + ': ', '') + '\n' + info.event.start.toLocaleString());
-        }
-    });
-    facility.addEventListener('change', () => calendar.refetchEvents());
-    calendar.render();
-})();
+window.cmmpInitChurchCalendar({});
 </script>
 <?php require __DIR__ . '/../../includes/footer.php'; ?>

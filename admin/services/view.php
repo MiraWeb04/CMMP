@@ -3,15 +3,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../helpers/service_request.php';
+require_once __DIR__ . '/../../helpers/pastor_access.php';
 require_once __DIR__ . '/../../services/AvailabilityService.php';
 
-require_role(SERVICE_REVIEW_ROLES);
+require_role(array_merge(SERVICE_REVIEW_ROLES, ['PASTOR']));
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 $request = $id ? ServiceRequest::find($id) : null;
 if (!$request) {
     http_response_code(404);
     exit('Service request not found.');
 }
+require_assigned_service_request((int) $request['id']);
 
 $canAssign = has_role(SERVICE_ASSIGN_ROLES);
 $assignmentRoles = service_assignment_roles((string) $request['service_code']);

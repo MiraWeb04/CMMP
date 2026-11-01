@@ -3,13 +3,20 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers/auth.php';
 require_once __DIR__ . '/../helpers/csrf.php';
+require_once __DIR__ . '/../helpers/registration.php';
 require_once __DIR__ . '/../models/Member.php';
 require_once __DIR__ . '/../models/Notification.php';
 
 start_secure_session();
 $errors = [];
-$username = '';
-$email = '';
+$fields = [
+    'username' => '',
+    'email' => '',
+    'first_name' => '',
+    'last_name' => '',
+    'date_of_birth' => '',
+    'gender' => '',
+];
 
 if (is_logged_in()) {
 	header('Location: ' . APP_BASE_URL . '/auth/protected-test.php');
@@ -18,15 +25,16 @@ if (is_logged_in()) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	require_valid_csrf_token();
-	$username = trim((string) ($_POST['username'] ?? ''));
-	$email = trim((string) ($_POST['email'] ?? ''));
+	foreach (array_keys($fields) as $key) {
+		$fields[$key] = trim((string) ($_POST[$key] ?? ''));
+	}
 	$password = (string) ($_POST['password'] ?? '');
 	$passwordConfirmation = (string) ($_POST['password_confirmation'] ?? '');
 
-	if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', $username)) {
+	if (!preg_match('/^[A-Za-z0-9._-]{3,100}$/', $fields['username'])) {
 		$errors[] = 'Username must be 3-100 characters using letters, numbers, dots, underscores, or hyphens.';
 	}
-	if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+	if (!filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
 		$errors[] = 'Enter a valid email address.';
 	}
 	if (strlen($password) < 8) {
@@ -36,12 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$errors[] = 'Password confirmation does not match.';
 	}
 
+	$errors = array_merge($errors, validate_member_registration_profile($fields));
+
 	if ($errors === []) {
 		$pdo = database();
 		try {
 			$pdo->beginTransaction();
 			$check = $pdo->prepare('SELECT id FROM users WHERE username = :username OR email = :email LIMIT 1');
-			$check->execute(['username' => $username, 'email' => $email]);
+			$check->execute(['username' => $fields['username'], 'email' => $fields['email']]);
 
 			if ($check->fetch()) {
 				throw new DomainException('Registration could not be completed with those details.');
@@ -52,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				 VALUES (:username, :email, :password_hash, :status)'
 			);
 			$insertUser->execute([
-				'username' => $username,
-				'email' => $email,
+				'username' => $fields['username'],
+				'email' => $fields['email'],
 				'password_hash' => password_hash($password, PASSWORD_DEFAULT),
 				'status' => 'PENDING',
 			]);
@@ -69,14 +79,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			$assignRole = $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (:user_id, :role_id)');
 			$assignRole->execute(['user_id' => $userId, 'role_id' => $roleId]);
 
-			// Ensure the public registration flow creates a linked members profile immediately,
-			// otherwise the member-side navigation pages block with the profile-not-created message.
-			$firstName = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '', $username));
-			$lastName = 'Member';
-			Member::createFromRegistration($userId, $firstName === '' ? 'Member' : $firstName, $lastName, $email);
+			Member::createFromRegistration($userId, [
+				'first_name' => $fields['first_name'],
+				'last_name' => $fields['last_name'],
+				'email' => $fields['email'],
+				'date_of_birth' => $fields['date_of_birth'],
+				'gender' => $fields['gender'],
+			]);
+			Notification::create(
+				$userId,
+				'Registration received',
+				'Thank you for registering with the UCCP Church Management & Member Portal. A church administrator will review your account and notify you when you can sign in.',
+				'MEMBER_REGISTRATION_RECEIVED',
+				'user',
+				$userId
+			);
 			Notification::notifyAdministrators(
 				'New member registration',
-				$username . ' (' . $email . ') is waiting for approval.',
+				$fields['first_name'] . ' ' . $fields['last_name'] . ' (' . $fields['email'] . ') is waiting for approval.',
 				'MEMBER_REGISTRATION_PENDING',
 				'user',
 				$userId
@@ -98,6 +118,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		}
 	}
 }
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -108,6 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
 	<link href="../assets/css/style.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/style.css') ?>" rel="stylesheet">
+	<link rel="icon" type="image/png" href="../assets/images/uccp-logo.png">
 </head>
 <body class="cmmp-auth-body">
 <main class="cmmp-auth-page">
@@ -116,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			<div class="cmmp-auth-side-inner">
 				<a class="cmmp-auth-brand-row" href="<?= htmlspecialchars(APP_BASE_URL, ENT_QUOTES, 'UTF-8') ?>/member-portal.php">
 					<span class="cmmp-auth-logo">
-						<i class="fa-solid fa-church"></i>
+						<img src="../assets/images/uccp-logo.png" alt="UCCP logo" width="56" height="56" decoding="async">
 					</span>
 					<div>
 						<span class="cmmp-auth-kicker">CMMP</span>
@@ -127,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				<div class="cmmp-auth-heading">
 					<span class="cmmp-auth-tag">Welcome</span>
 					<h1>Join the Church Community</h1>
-					<p>Become part of a caring fellowship that grows together in faith, service, and worship.</p>
+					<p>Register with your personal details. A church administrator will review and complete your membership.</p>
 				</div>
 
 				<div class="cmmp-auth-benefits">
@@ -182,35 +204,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 					<form method="post" novalidate class="cmmp-auth-form">
 						<?= csrf_field() ?>
-						<div class="mb-3">
-							<label class="form-label" for="username">Username</label>
-							<div class="input-group">
-								<span class="input-group-text"><i class="fa-solid fa-user"></i></span>
-								<input class="form-control" id="username" name="username" value="<?= htmlspecialchars($username, ENT_QUOTES, 'UTF-8') ?>" required autocomplete="username" placeholder="Choose a username">
+						<div class="row g-3">
+							<div class="col-md-6">
+								<label class="form-label" for="first_name">First name</label>
+								<input class="form-control" id="first_name" name="first_name" value="<?= htmlspecialchars($fields['first_name'], ENT_QUOTES, 'UTF-8') ?>" required maxlength="100">
 							</div>
-						</div>
-						<div class="mb-3">
-							<label class="form-label" for="email">Email address</label>
-							<div class="input-group">
-								<span class="input-group-text"><i class="fa-solid fa-envelope"></i></span>
-								<input class="form-control" id="email" name="email" type="email" value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email" placeholder="name@email.com">
+							<div class="col-md-6">
+								<label class="form-label" for="last_name">Last name</label>
+								<input class="form-control" id="last_name" name="last_name" value="<?= htmlspecialchars($fields['last_name'], ENT_QUOTES, 'UTF-8') ?>" required maxlength="100">
 							</div>
-						</div>
-						<div class="mb-3">
-							<label class="form-label" for="password">Password</label>
-							<div class="input-group">
-								<span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
+							<div class="col-md-6">
+								<label class="form-label" for="date_of_birth">Date of birth</label>
+								<input class="form-control" id="date_of_birth" name="date_of_birth" type="date" value="<?= htmlspecialchars($fields['date_of_birth'], ENT_QUOTES, 'UTF-8') ?>" required>
+							</div>
+							<div class="col-md-6">
+								<label class="form-label" for="gender">Gender</label>
+								<select class="form-select" id="gender" name="gender" required>
+									<option value="">Select gender</option>
+									<option value="Male" <?= $fields['gender'] === 'Male' ? 'selected' : '' ?>>Male</option>
+									<option value="Female" <?= $fields['gender'] === 'Female' ? 'selected' : '' ?>>Female</option>
+								</select>
+							</div>
+							<div class="col-md-6">
+								<label class="form-label" for="username">Username</label>
+								<input class="form-control" id="username" name="username" value="<?= htmlspecialchars($fields['username'], ENT_QUOTES, 'UTF-8') ?>" required autocomplete="username" placeholder="Choose a username">
+							</div>
+							<div class="col-md-6">
+								<label class="form-label" for="email">Email address</label>
+								<input class="form-control" id="email" name="email" type="email" value="<?= htmlspecialchars($fields['email'], ENT_QUOTES, 'UTF-8') ?>" required autocomplete="email" placeholder="name@email.com">
+							</div>
+							<div class="col-md-6">
+								<label class="form-label" for="password">Password</label>
 								<input class="form-control" id="password" name="password" type="password" required autocomplete="new-password" placeholder="At least 8 characters">
 							</div>
-						</div>
-						<div class="mb-4">
-							<label class="form-label" for="password_confirmation">Confirm password</label>
-							<div class="input-group">
-								<span class="input-group-text"><i class="fa-solid fa-lock"></i></span>
+							<div class="col-md-6">
+								<label class="form-label" for="password_confirmation">Confirm password</label>
 								<input class="form-control" id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" placeholder="Repeat your password">
 							</div>
 						</div>
-						<button class="btn btn-primary cmmp-auth-submit w-100" type="submit">
+						<button class="btn btn-primary cmmp-auth-submit w-100 mt-4" type="submit">
 							<i class="fa-solid fa-user-plus me-2"></i>
 							Create account
 						</button>

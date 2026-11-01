@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/pagination.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../models/User.php';
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 $canApproveMembers = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
 
@@ -21,16 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_user_id'])) {
     }
 }
 
-$users = $pdo->query(
-        'SELECT u.id, u.username, u.email, u.role, u.status, u.last_login_at,
-            COALESCE(u.role, GROUP_CONCAT(r.code ORDER BY r.code SEPARATOR ", ")) AS roles,
-            GROUP_CONCAT(ur.role_id ORDER BY ur.role_id SEPARATOR ",") AS role_ids
-     FROM users u
-     LEFT JOIN user_roles ur ON ur.user_id = u.id
-     LEFT JOIN roles r ON r.id = ur.role_id
-     GROUP BY u.id
-     ORDER BY u.username ASC'
-)->fetchAll();
+$search = trim((string) ($_GET['search'] ?? ''));
+$status = (string) ($_GET['status'] ?? '');
+$page = list_page();
+$perPage = list_per_page();
+$result = User::paginate($search, $status, $page, $perPage);
+$users = $result['items'];
+$page = min($page, pagination_total_pages($result['total'], $perPage));
 
 $pageTitle = 'Users & Roles';
 $activeNav = 'users';
@@ -68,15 +67,40 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 <div class="alert alert-danger"><?= e((string) $_GET['error']) ?></div>
 <?php endif; ?>
 <?php
-$pendingUsers = array_values(array_filter($users, static fn (array $user): bool => $user['status'] === 'PENDING'));
+$pendingCount = (int) $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'PENDING'")->fetchColumn();
 ?>
-<?php if ($canApproveMembers && $pendingUsers !== []): ?>
+<?php if ($canApproveMembers && $pendingCount > 0): ?>
 <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3">
-    <span><?= count($pendingUsers) ?> new member <?= count($pendingUsers) === 1 ? 'registration is' : 'registrations are' ?> waiting for approval.</span>
+    <span><?= $pendingCount ?> new member <?= $pendingCount === 1 ? 'registration is' : 'registrations are' ?> waiting for approval.</span>
     <a class="btn btn-sm btn-primary" href="../members/registrations.php">Review registrations</a>
 </div>
 <?php endif; ?>
 
+<div class="cmmp-card mb-4">
+    <form method="get" class="row g-3 align-items-end">
+        <div class="col-lg-6">
+            <label class="form-label" for="search">Search users</label>
+            <input class="form-control" id="search" name="search" value="<?= e($search) ?>" placeholder="Username or email">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="status">Status</label>
+            <select class="form-select" id="status" name="status">
+                <option value="">All statuses</option>
+                <?php foreach (['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'] as $item): ?>
+                    <option value="<?= $item ?>" <?= $status === $item ? 'selected' : '' ?>><?= $item ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-auto">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" href="index.php">Reset</a>
+        </div>
+    </form>
+</div>
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="cmmp-section-title my-0">User directory</h2>
+    <span class="text-muted small"><?= (int) $result['total'] ?> record(s)</span>
+</div>
 <div class="cmmp-card">
     <div class="table-responsive">
         <table class="table table-striped align-middle">
@@ -91,6 +115,7 @@ $pendingUsers = array_values(array_filter($users, static fn (array $user): bool 
                 </tr>
             </thead>
             <tbody>
+                <?php if ($users === []): ?><tr><td colspan="6" class="text-center py-5 text-muted">No users matched your filters.</td></tr><?php endif; ?>
                 <?php foreach ($users as $user): ?>
                     <tr>
                         <td><?= htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8') ?></td>
@@ -114,6 +139,14 @@ $pendingUsers = array_values(array_filter($users, static fn (array $user): bool 
         </table>
     </div>
 </div>
+<?php
+$paginationTotal = $result['total'];
+$paginationPage = $page;
+$paginationPerPage = $perPage;
+$paginationFilters = ['search' => $search, 'status' => $status];
+$paginationLabel = 'User pages';
+require __DIR__ . '/../../includes/pagination.php';
+?>
 <?php foreach ($users as $user): ?>
 <?php $userRoleIds = $user['role_ids'] === null || $user['role_ids'] === '' ? [] : array_map('intval', explode(',', $user['role_ids'])); ?>
 <div class="modal fade" id="editUserModal<?= (int) $user['id'] ?>" tabindex="-1" aria-labelledby="editUserModalLabel<?= (int) $user['id'] ?>" aria-hidden="true">

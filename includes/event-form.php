@@ -5,6 +5,7 @@ $event = $event ?? [];
 $errors = $errors ?? [];
 $formAction = $formAction ?? '';
 $submitLabel = $submitLabel ?? 'Save event';
+$pastors = $pastors ?? event_pastors();
 $value = static fn (string $field): string => e((string) ($event[$field] ?? ''));
 ?>
 <?php if ($errors !== []): ?><div class="alert alert-danger"><ul class="mb-0"><?php foreach ($errors as $error): ?><li><?= e($error) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
@@ -16,6 +17,7 @@ $value = static fn (string $field): string => e((string) ($event[$field] ?? ''))
         <div class="col-12"><label class="form-label" for="description">Description</label><textarea class="form-control" id="description" name="description" rows="4"><?= $value('description') ?></textarea></div>
         <div class="col-md-6"><label class="form-label" for="start_datetime">Start date/time</label><input class="form-control" id="start_datetime" name="start_datetime" type="datetime-local" value="<?= $value('start_datetime') ?>" required></div>
         <div class="col-md-6"><label class="form-label" for="end_datetime">End date/time</label><input class="form-control" id="end_datetime" name="end_datetime" type="datetime-local" value="<?= $value('end_datetime') ?>" required></div>
+        <div class="col-md-6"><label class="form-label" for="pastor_staff_id">Assigned pastor</label><select class="form-select" id="pastor_staff_id" name="pastor_staff_id" required><option value="">Select pastor</option><?php foreach ($pastors as $pastor): ?><option value="<?= (int) $pastor['id'] ?>" <?= (string) ($event['pastor_staff_id'] ?? '') === (string) $pastor['id'] ? 'selected' : '' ?>><?= e($pastor['display_name']) ?></option><?php endforeach; ?></select><div class="form-text">Every church event must include a pastor.</div></div>
         <div class="col-md-6"><label class="form-label" for="facility_id">Facility</label><select class="form-select" id="facility_id" name="facility_id"><option value="">No facility assigned</option><?php foreach ($facilities as $facility): ?><option value="<?= (int) $facility['id'] ?>" <?= (string) ($event['facility_id'] ?? '') === (string) $facility['id'] ? 'selected' : '' ?>><?= e($facility['name'] . ' (' . $facility['code'] . ')') ?></option><?php endforeach; ?></select><div class="form-text">Uses the centralized facility relationship for future scheduling.</div></div>
         <div class="col-md-3"><label class="form-label" for="capacity">Capacity</label><input class="form-control" id="capacity" name="capacity" type="number" min="1" max="100000" value="<?= $value('capacity') ?>"></div>
         <div class="col-md-3"><label class="form-label" for="event_status">Status</label><select class="form-select" id="event_status" name="event_status"><?php foreach (EVENT_STATUSES as $status): ?><option value="<?= e($status) ?>" <?= ($event['event_status'] ?? 'DRAFT') === $status ? 'selected' : '' ?>><?= e($status) ?></option><?php endforeach; ?></select></div>

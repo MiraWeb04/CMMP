@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/member.php';
-
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 
 $filters = [

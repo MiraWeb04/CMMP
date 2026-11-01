@@ -1,0 +1,20 @@
+{
+    "name": "cmmp/church-portal",
+    "description": "Church Management & Member Portal",
+    "type": "project",
+    "require": {
+        "php": ">=8.0",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"file_put_contents('vendor/.htaccess', \\\"Require all denied\\n\\\");\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"file_put_contents('vendor/.htaccess', \\\"Require all denied\\n\\\");\""
+        ]
+    }
+}

@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/pagination.php';
 require_once __DIR__ . '/../../models/Personnel.php';
 
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 
-$people = Personnel::list('PASTOR');
+$page = list_page();
+$perPage = list_per_page();
+$result = Personnel::paginate('PASTOR', $page, $perPage);
+$people = $result['items'];
 $details = [];
 foreach ($people as $person) {
 	$details[(int) $person['id']] = Personnel::find((int) $person['id']);
@@ -92,4 +96,12 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 <div class="modal fade" id="viewPastor<?= (int) $person['id'] ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Pastor profile</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-5">Name</dt><dd class="col-7"><?= e($detail['display_name']) ?></dd><dt class="col-5">Email</dt><dd class="col-7"><?= e($detail['email'] ?? 'No email') ?></dd><dt class="col-5">Pastor number</dt><dd class="col-7"><?= e($detail['employee_number']) ?></dd><dt class="col-5">Position</dt><dd class="col-7"><?= e($detail['position_title']) ?></dd><dt class="col-5">Ordination date</dt><dd class="col-7"><?= e($detail['ordination_date'] ?? 'Not set') ?></dd></dl></div></div></div></div>
 <div class="modal fade" id="editPastor<?= (int) $person['id'] ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form method="post"><div class="modal-header"><h2 class="modal-title fs-5">Edit pastor</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><?= csrf_field() ?><input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="<?= (int) $detail['id'] ?>"><div class="mb-3"><label class="form-label" for="pastor-number-<?= (int) $detail['id'] ?>">Pastor number</label><input class="form-control" id="pastor-number-<?= (int) $detail['id'] ?>" name="employee_number" value="<?= e($detail['employee_number']) ?>" required></div><div class="mb-3"><label class="form-label" for="pastor-position-<?= (int) $detail['id'] ?>">Position</label><input class="form-control" id="pastor-position-<?= (int) $detail['id'] ?>" name="position_title" value="<?= e($detail['position_title']) ?>" required></div><div><label class="form-label" for="pastor-ordination-<?= (int) $detail['id'] ?>">Ordination date</label><input class="form-control" id="pastor-ordination-<?= (int) $detail['id'] ?>" name="ordination_date" type="date" value="<?= e($detail['ordination_date'] ?? '') ?>"></div></div><div class="modal-footer"><button class="btn btn-primary" type="submit">Save changes</button><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button></div></form></div></div></div>
 <?php endforeach; ?>
-<?php require __DIR__ . '/../../includes/footer.php'; ?>
+<?php
+$paginationTotal = $result['total'];
+$paginationPage = $page;
+$paginationPerPage = $perPage;
+$paginationFilters = [];
+$paginationLabel = 'Pastor pages';
+require __DIR__ . '/../../includes/pagination.php';
+require __DIR__ . '/../../includes/footer.php';
+?>

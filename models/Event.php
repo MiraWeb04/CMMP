@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/Notification.php';
 require_once __DIR__ . '/ChurchCalendar.php';
+require_once __DIR__ . '/Personnel.php';
 
 final class Event
 {
@@ -22,8 +23,10 @@ final class Event
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(e.title LIKE :search OR e.description LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(e.title LIKE :search_title OR e.description LIKE :search_description)';
+            $parameters['search_title'] = $term;
+            $parameters['search_description'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'e.event_status = :status';
@@ -113,8 +116,35 @@ final class Event
         );
         $query->execute(['id' => $id, 'member_id' => $memberId ?? 0]);
         $event = $query->fetch();
+        if (!$event) {
+            return null;
+        }
 
-        return $event ?: null;
+        $event['pastor_staff_id'] = self::assignedPastorStaffId($id);
+
+        return $event;
+    }
+
+    public static function assignedPastorStaffId(int $eventId): ?int
+    {
+        $query = database()->prepare(
+            'SELECT ea.staff_id
+             FROM event_assignments ea
+             INNER JOIN pastors p ON p.staff_id = ea.staff_id
+             WHERE ea.event_id = :event_id
+             LIMIT 1'
+        );
+        $query->execute(['event_id' => $eventId]);
+        $staffId = $query->fetchColumn();
+
+        return $staffId === false ? null : (int) $staffId;
+    }
+
+    public static function syncPastorAssignment(int $eventId, int $staffId): void
+    {
+        database()->prepare('DELETE ea FROM event_assignments ea INNER JOIN pastors p ON p.staff_id = ea.staff_id WHERE ea.event_id = :event_id')
+            ->execute(['event_id' => $eventId]);
+        Personnel::saveEventAssignment($eventId, $staffId, 'Pastor');
     }
 
     public static function create(array $data): int
@@ -140,8 +170,13 @@ final class Event
                  :end_datetime, :location, :capacity, :registration_required, :registration_deadline,
                  :event_image, :event_status)'
             );
+            $pastorStaffId = filter_var($data['pastor_staff_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+            unset($data['pastor_staff_id']);
             $query->execute($data);
             $eventId = (int) $connection->lastInsertId();
+            if ($pastorStaffId) {
+                self::syncPastorAssignment($eventId, $pastorStaffId);
+            }
             $connection->commit();
             return $eventId;
         } catch (Throwable $exception) {
@@ -156,6 +191,7 @@ final class Event
             'category_id', 'facility_id', 'title', 'description', 'start_datetime', 'end_datetime',
             'location', 'capacity', 'registration_required', 'registration_deadline', 'event_image',
         ];
+        $pastorStaffId = filter_var($data['pastor_staff_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
         $data = array_intersect_key($data, array_flip($allowed));
         $connection = database();
         $connection->beginTransaction();
@@ -180,13 +216,19 @@ final class Event
             $assignments[] = $column . ' = :' . $column;
         }
         if ($assignments === []) {
-                $connection->commit();
+            if ($pastorStaffId) {
+                self::syncPastorAssignment($id, $pastorStaffId);
+            }
+            $connection->commit();
             return;
         }
         $data['id'] = $id;
         $query = $connection->prepare('UPDATE events SET ' . implode(', ', $assignments) . ' WHERE id = :id');
         $query->execute($data);
-            $connection->commit();
+        if ($pastorStaffId) {
+            self::syncPastorAssignment($id, $pastorStaffId);
+        }
+        $connection->commit();
         } catch (Throwable $exception) {
             if ($connection->inTransaction()) { $connection->rollBack(); }
             throw $exception;
@@ -202,6 +244,9 @@ final class Event
             $currentQuery->execute(['id' => $id]);
             $current = $currentQuery->fetch();
             if (!$current) { throw new RuntimeException('Event not found.'); }
+            if ($status !== 'CANCELLED' && self::assignedPastorStaffId($id) === null) {
+                throw new RuntimeException('Assign a pastor before updating this event.');
+            }
             if ($status === 'PUBLISHED' && $current['event_status'] !== 'PUBLISHED') {
                 ChurchCalendar::lockDateRange($connection, (string) $current['start_datetime'], (string) $current['end_datetime']);
                 ChurchCalendar::assertAvailable(

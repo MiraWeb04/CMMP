@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../helpers/fellowship.php';
 require_once __DIR__ . '/../services/NotificationService.php';
 
 final class Ministry
@@ -48,6 +49,27 @@ final class Ministry
         return $ministries;
     }
 
+    public static function paginateAdmin(int $page, int $perPage): array
+    {
+        $total = (int) database()->query('SELECT COUNT(*) FROM ministries')->fetchColumn();
+        $query = database()->prepare(
+            'SELECT m.id, m.name, m.code, m.description, m.ministry_status,
+                    COALESCE(CONCAT(leader_member.first_name, " ", leader_member.last_name), "Not assigned") AS leader_name,
+                    COUNT(DISTINCT mm.member_id) AS member_count
+             FROM ministries m
+             LEFT JOIN staff leader_staff ON leader_staff.id = m.leader_staff_id
+             LEFT JOIN members leader_member ON leader_member.id = leader_staff.member_id
+             LEFT JOIN ministry_members mm ON mm.ministry_id = m.id AND mm.left_at IS NULL
+             GROUP BY m.id
+             ORDER BY m.name
+             LIMIT :limit OFFSET :offset'
+        );
+        $query->bindValue(':limit', $perPage, PDO::PARAM_INT);
+        $query->bindValue(':offset', ($page - 1) * $perPage, PDO::PARAM_INT);
+        $query->execute();
+        return ['items' => $query->fetchAll(), 'total' => $total];
+    }
+
     public static function find(int $id): ?array
     {
         $query = database()->prepare(
@@ -79,15 +101,25 @@ final class Ministry
 
     public static function create(array $data): int
     {
+        $leaderStaffId = isset($data['leader_staff_id']) ? (int) $data['leader_staff_id'] : 0;
+        if ($leaderStaffId > 0) {
+            self::assertStaffCanLeadMinistry($leaderStaffId, null);
+        }
+
         $query = database()->prepare('INSERT INTO ministries (name, code, description, ministry_status, leader_staff_id) VALUES (:name, :code, :description, :status, :leader_staff_id)');
-        $query->execute(['name' => $data['name'], 'code' => $data['code'], 'description' => $data['description'], 'status' => 'ACTIVE', 'leader_staff_id' => $data['leader_staff_id'] ?: null]);
+        $query->execute(['name' => $data['name'], 'code' => $data['code'], 'description' => $data['description'], 'status' => 'ACTIVE', 'leader_staff_id' => $leaderStaffId > 0 ? $leaderStaffId : null]);
         return (int) database()->lastInsertId();
     }
 
     public static function update(int $id, array $data): void
     {
+        $leaderStaffId = isset($data['leader_staff_id']) ? (int) $data['leader_staff_id'] : 0;
+        if ($leaderStaffId > 0) {
+            self::assertStaffCanLeadMinistry($leaderStaffId, $id);
+        }
+
         $query = database()->prepare('UPDATE ministries SET name = :name, description = :description, leader_staff_id = :leader_staff_id WHERE id = :id');
-        $query->execute(['id' => $id, 'name' => $data['name'], 'description' => $data['description'], 'leader_staff_id' => $data['leader_staff_id'] ?: null]);
+        $query->execute(['id' => $id, 'name' => $data['name'], 'description' => $data['description'], 'leader_staff_id' => $leaderStaffId > 0 ? $leaderStaffId : null]);
     }
 
     public static function setStatus(int $id, string $status): void
@@ -115,6 +147,26 @@ final class Ministry
         );
         $query->execute(['exclude_id' => $excludeMinistryId ?? 0]);
         return $query->fetchAll();
+    }
+
+    /**
+     * Active members who are not already assigned to another ministry (member or leader).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function membersEligibleForAssignment(?int $ministryId = null): array
+    {
+        $members = self::activeMembersWithMinistries($ministryId);
+        return array_values(array_filter(
+            $members,
+            static function (array $member): bool {
+                if (trim((string) ($member['other_ministries'] ?? '')) !== '') {
+                    return false;
+                }
+
+                return self::activeMinistryLedByMember((int) $member['id']) === null;
+            }
+        ));
     }
 
     public static function activePersonnel(): array
@@ -252,7 +304,172 @@ final class Ministry
     }
 
     public static function members(int $ministryId): array { return self::find($ministryId)['members'] ?? []; }
-    public static function addMember(int $ministryId, int $memberId, ?string $role): void { database()->prepare('INSERT INTO ministry_members (ministry_id, member_id, membership_role, joined_at, left_at) VALUES (:ministry_id, :member_id, :role, CURDATE(), NULL) ON DUPLICATE KEY UPDATE membership_role = VALUES(membership_role), joined_at = CURDATE(), left_at = NULL')->execute(['ministry_id' => $ministryId, 'member_id' => $memberId, 'role' => $role]); }
+
+    public static function memberIdForStaff(int $staffId): ?int
+    {
+        $query = database()->prepare('SELECT member_id FROM staff WHERE id = :id LIMIT 1');
+        $query->execute(['id' => $staffId]);
+        $memberId = $query->fetchColumn();
+
+        return $memberId === false || $memberId === null ? null : (int) $memberId;
+    }
+
+    /**
+     * @return array{ministry_id: int, ministry_name: string, membership_role: string|null}|null
+     */
+    public static function activeMembershipForMember(int $memberId): ?array
+    {
+        $query = database()->prepare(
+            'SELECT mm.ministry_id, mm.membership_role, m.name AS ministry_name
+             FROM ministry_members mm
+             INNER JOIN ministries m ON m.id = mm.ministry_id AND m.ministry_status = "ACTIVE"
+             WHERE mm.member_id = :member_id AND mm.left_at IS NULL
+             LIMIT 1'
+        );
+        $query->execute(['member_id' => $memberId]);
+        $row = $query->fetch();
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'ministry_id' => (int) $row['ministry_id'],
+            'ministry_name' => (string) $row['ministry_name'],
+            'membership_role' => $row['membership_role'] !== null ? (string) $row['membership_role'] : null,
+        ];
+    }
+
+    /**
+     * @return array{ministry_id: int, ministry_name: string}|null
+     */
+    public static function activeMinistryLedByMember(int $memberId, ?int $exceptMinistryId = null): ?array
+    {
+        $sql = 'SELECT m.id AS ministry_id, m.name AS ministry_name
+                FROM ministries m
+                INNER JOIN staff s ON s.id = m.leader_staff_id AND s.employment_status = "ACTIVE"
+                WHERE s.member_id = :member_id AND m.ministry_status = "ACTIVE"';
+        $params = ['member_id' => $memberId];
+        if ($exceptMinistryId !== null && $exceptMinistryId > 0) {
+            $sql .= ' AND m.id <> :except_id';
+            $params['except_id'] = $exceptMinistryId;
+        }
+        $sql .= ' LIMIT 1';
+
+        $query = database()->prepare($sql);
+        $query->execute($params);
+        $row = $query->fetch();
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'ministry_id' => (int) $row['ministry_id'],
+            'ministry_name' => (string) $row['ministry_name'],
+        ];
+    }
+
+    public static function assertMemberAvailableForMinistry(int $memberId, int $ministryId): void
+    {
+        $membership = self::activeMembershipForMember($memberId);
+        if ($membership !== null) {
+            $roleLabel = $membership['membership_role'] !== null && $membership['membership_role'] !== ''
+                ? $membership['membership_role']
+                : 'Member';
+            if ($membership['ministry_id'] === $ministryId) {
+                throw new InvalidArgumentException(
+                    'This member is already assigned to ' . $membership['ministry_name'] . ' as ' . $roleLabel . '. Remove them first to assign a different role.'
+                );
+            }
+
+            throw new InvalidArgumentException(
+                'This member is already assigned to ' . $membership['ministry_name'] . '. Remove that assignment before adding them to another ministry.'
+            );
+        }
+
+        $led = self::activeMinistryLedByMember($memberId);
+        if ($led !== null) {
+            throw new InvalidArgumentException(
+                'This member is the leader of ' . $led['ministry_name'] . '. Remove that leadership assignment before adding them as a ministry member.'
+            );
+        }
+    }
+
+    public static function assertStaffCanLeadMinistry(int $staffId, ?int $ministryId = null): void
+    {
+        if ($staffId <= 0) {
+            return;
+        }
+
+        $memberId = self::memberIdForStaff($staffId);
+        if ($memberId === null) {
+            throw new InvalidArgumentException('The selected leader must be linked to a church member record.');
+        }
+
+        $led = self::activeMinistryLedByMember($memberId, $ministryId);
+        if ($led !== null) {
+            throw new InvalidArgumentException(
+                'This person is already the leader of ' . $led['ministry_name'] . '. They cannot lead another ministry.'
+            );
+        }
+
+        $membership = self::activeMembershipForMember($memberId);
+        if ($membership !== null) {
+            $roleLabel = $membership['membership_role'] !== null && $membership['membership_role'] !== ''
+                ? $membership['membership_role']
+                : 'Member';
+            throw new InvalidArgumentException(
+                'This person is already assigned to ' . $membership['ministry_name'] . ' as ' . $roleLabel . '. Remove that assignment before setting them as a ministry leader.'
+            );
+        }
+    }
+
+    public static function addMember(int $ministryId, int $memberId, ?string $role, bool $fromFellowshipSync = false): void
+    {
+        $ministryQuery = database()->prepare('SELECT code FROM ministries WHERE id = :id LIMIT 1');
+        $ministryQuery->execute(['id' => $ministryId]);
+        $code = (string) ($ministryQuery->fetchColumn() ?: '');
+
+        if (fellowship_is_organization_code($code)) {
+            if (!$fromFellowshipSync) {
+                fellowship_assert_member_eligible($memberId, $code);
+            }
+
+            $existingFellowship = fellowship_active_code_for_member($memberId);
+            if ($existingFellowship !== null && strtoupper($existingFellowship) !== strtoupper($code)) {
+                throw new InvalidArgumentException(
+                    'This member is already assigned to ' . fellowship_label_for_code($existingFellowship) . '. Fellowship organizations cannot be changed manually.'
+                );
+            }
+        }
+
+        self::assertMemberAvailableForMinistry($memberId, $ministryId);
+
+        $roleValue = $role !== null && trim($role) !== '' ? trim($role) : 'Member';
+        $existingRow = database()->prepare(
+            'SELECT left_at FROM ministry_members WHERE ministry_id = :ministry_id AND member_id = :member_id LIMIT 1'
+        );
+        $existingRow->execute(['ministry_id' => $ministryId, 'member_id' => $memberId]);
+        $row = $existingRow->fetch();
+
+        if ($row && $row['left_at'] === null) {
+            throw new InvalidArgumentException('This member is already assigned to this ministry.');
+        }
+
+        if ($row) {
+            database()->prepare(
+                'UPDATE ministry_members
+                 SET membership_role = :role, joined_at = CURDATE(), left_at = NULL
+                 WHERE ministry_id = :ministry_id AND member_id = :member_id'
+            )->execute(['ministry_id' => $ministryId, 'member_id' => $memberId, 'role' => $roleValue]);
+
+            return;
+        }
+
+        database()->prepare(
+            'INSERT INTO ministry_members (ministry_id, member_id, membership_role, joined_at, left_at)
+             VALUES (:ministry_id, :member_id, :role, CURDATE(), NULL)'
+        )->execute(['ministry_id' => $ministryId, 'member_id' => $memberId, 'role' => $roleValue]);
+    }
     public static function removeMember(int $ministryId, int $memberId): void { database()->prepare('UPDATE ministry_members SET left_at = CURDATE() WHERE ministry_id = :ministry_id AND member_id = :member_id AND left_at IS NULL')->execute(['ministry_id' => $ministryId, 'member_id' => $memberId]); }
 
     public static function membershipIdsForMember(int $memberId): array

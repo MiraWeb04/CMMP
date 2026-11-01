@@ -15,7 +15,7 @@ if (!$ministry) {
     exit('Ministry not found.');
 }
 $people = Ministry::activePersonnel();
-$members = Ministry::activeMembersWithMinistries($id);
+$members = Ministry::membersEligibleForAssignment($id);
 $assignedIds = array_map('intval', array_column($ministry['members'], 'member_id'));
 $memberChoices = array_values(array_filter(
     $members,

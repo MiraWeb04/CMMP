@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../models/AuditLog.php';
 require_once __DIR__ . '/../../models/Notification.php';
+require_once __DIR__ . '/../../helpers/fellowship.php';
 
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -35,6 +36,12 @@ if ($decision === 'approve') {
     $connection->prepare(
         'UPDATE members SET membership_status = "ACTIVE", joined_at = CURDATE() WHERE user_id = :id'
     )->execute(['id' => $userId]);
+    $memberQuery = $connection->prepare('SELECT id, date_of_birth, gender FROM members WHERE user_id = :id LIMIT 1');
+    $memberQuery->execute(['id' => $userId]);
+    $member = $memberQuery->fetch();
+    if ($member) {
+        fellowship_sync_member((int) $member['id'], $member['date_of_birth'] ?? null, $member['gender'] ?? null);
+    }
     AuditLog::record((int) current_user_id(), 'MEMBER_REGISTRATION_APPROVED', 'USER', $userId);
     Notification::create($userId, 'Registration approved', 'A church administrator approved your account. You can sign in now.', 'MEMBER_REGISTRATION_APPROVED', 'user', $userId);
     header('Location: ' . registration_decision_redirect('approved'));
@@ -44,6 +51,14 @@ if ($decision === 'approve') {
 $connection->prepare('UPDATE users SET status = "INACTIVE" WHERE id = :id AND status = "PENDING"')->execute(['id' => $userId]);
 $connection->prepare('UPDATE members SET membership_status = "INACTIVE" WHERE user_id = :id')->execute(['id' => $userId]);
 AuditLog::record((int) current_user_id(), 'MEMBER_REGISTRATION_DECLINED', 'USER', $userId);
+Notification::create(
+    $userId,
+    'Registration update',
+    'A church administrator was unable to approve your registration. Please contact the church office if you have questions.',
+    'MEMBER_REGISTRATION_DECLINED',
+    'user',
+    $userId
+);
 header('Location: ' . registration_decision_redirect('declined'));
 exit;
 

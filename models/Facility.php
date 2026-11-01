@@ -10,8 +10,11 @@ final class Facility
         $conditions = [];
         $parameters = [];
         if ($search !== '') {
-            $conditions[] = '(f.name LIKE :search OR f.code LIKE :search OR f.location LIKE :search)';
-            $parameters['search'] = '%' . $search . '%';
+            $term = '%' . $search . '%';
+            $conditions[] = '(f.name LIKE :search_name OR f.code LIKE :search_code OR f.location LIKE :search_location)';
+            $parameters['search_name'] = $term;
+            $parameters['search_code'] = $term;
+            $parameters['search_location'] = $term;
         }
         if ($status !== '') {
             $conditions[] = 'f.facility_status = :status';

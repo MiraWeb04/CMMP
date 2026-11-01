@@ -89,7 +89,13 @@ try {
         'status' => 'ACTIVE',
     ]);
     $profileCreateUserId = (int) $connection->lastInsertId();
-    $profileMemberId = Member::createFromRegistration($profileCreateUserId, 'Profile', 'User', $profileEmail);
+    $profileMemberId = Member::createFromRegistration($profileCreateUserId, [
+        'first_name' => 'Profile',
+        'last_name' => 'User',
+        'email' => $profileEmail,
+        'date_of_birth' => '1998-05-10',
+        'gender' => 'Female',
+    ]);
     $profileMember = Member::find($profileMemberId);
     if (!$profileMember || (int) $profileMember['user_id'] !== $profileCreateUserId || $profileMember['first_name'] !== 'Profile' || $profileMember['last_name'] !== 'User') {
         throw new RuntimeException('Registration-style member creation failed.');

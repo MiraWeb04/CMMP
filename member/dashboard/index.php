@@ -39,17 +39,36 @@ $dashboardActions = [
     ['title' => 'Events', 'description' => 'View upcoming church events and register when available.', 'icon' => 'fa-calendar-plus', 'url' => APP_BASE_URL . '/member/events/'],
     ['title' => 'Ministries', 'description' => 'View ministry groups. Administration assigns leaders and members.', 'icon' => 'fa-people-group', 'url' => APP_BASE_URL . '/member/ministries/'],
     ['title' => 'Announcements', 'description' => 'Read important updates about church schedules.', 'icon' => 'fa-bullhorn', 'url' => APP_BASE_URL . '/member/announcements/'],
-    ['title' => 'My profile', 'description' => 'View and update your basic personal information.', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/member/profile/'],
+    ['title' => 'My profile', 'description' => 'View and update your basic personal information.', 'icon' => 'fa-user', 'url' => APP_BASE_URL . '/account/profile.php'],
 ];
 $dashboardRecentTitle = 'Recent requests';
 $dashboardRecentEmpty = 'You have not submitted a service or facility request yet.';
 $dashboardRecentItems = [];
 foreach (array_slice($requests, 0, 6) as $request) {
+    $actionHtml = '';
+    if (ServiceRequest::memberCanHide($request, $memberId)) {
+        ob_start();
+        $hideRequestId = (int) $request['id'];
+        $hideReturnTo = 'dashboard';
+        $hideButtonLabel = 'Delete';
+        require __DIR__ . '/../../includes/member-hide-request-form.php';
+        $actionHtml = (string) ob_get_clean();
+    }
     $dashboardRecentItems[] = [
         'title' => $request['request_number'] . ' · ' . $request['service_name'],
         'meta' => service_status_label((string) $request['status']) . ' · ' . $request['requested_at'],
         'url' => APP_BASE_URL . '/member/services/view.php?id=' . (int) $request['id'],
+        'action_html' => $actionHtml,
     ];
+}
+
+$dashboardNotice = '';
+$dashboardNoticeClass = 'alert-success';
+if (isset($_GET['hidden'])) {
+    $dashboardNotice = 'The completed request was deleted from your list. Church staff still have the original record.';
+} elseif (!empty($_GET['hide_error'])) {
+    $dashboardNotice = (string) $_GET['hide_error'];
+    $dashboardNoticeClass = 'alert-danger';
 }
 
 require __DIR__ . '/../../includes/role-dashboard.php';

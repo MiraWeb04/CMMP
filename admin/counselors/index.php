@@ -3,11 +3,15 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../helpers/auth.php';
 require_once __DIR__ . '/../../helpers/csrf.php';
+require_once __DIR__ . '/../../helpers/pagination.php';
 require_once __DIR__ . '/../../models/Personnel.php';
 
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
 
-$people = Personnel::list('COUNSELOR');
+$page = list_page();
+$perPage = list_per_page();
+$result = Personnel::paginate('COUNSELOR', $page, $perPage);
+$people = $result['items'];
 $details = [];
 foreach ($people as $person) {
 	$details[(int) $person['id']] = Personnel::find((int) $person['id']);
@@ -94,4 +98,12 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 <div class="modal fade" id="viewCounselor<?= (int) $person['id'] ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5">Counselor profile</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><dl class="row mb-0"><dt class="col-5">Name</dt><dd class="col-7"><?= e($detail['display_name']) ?></dd><dt class="col-5">Email</dt><dd class="col-7"><?= e($detail['email'] ?? 'No email') ?></dd><dt class="col-5">Employee number</dt><dd class="col-7"><?= e($detail['employee_number']) ?></dd><dt class="col-5">Position</dt><dd class="col-7"><?= e($detail['position_title']) ?></dd><dt class="col-5">Specialization</dt><dd class="col-7"><?= e($detail['specialization'] ?? 'Not set') ?></dd><dt class="col-5">Credentials</dt><dd class="col-7"><?= e($detail['credentials'] ?? 'Not set') ?></dd></dl></div></div></div></div>
 <div class="modal fade" id="editCounselor<?= (int) $person['id'] ?>" tabindex="-1" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><form method="post"><div class="modal-header"><h2 class="modal-title fs-5">Edit counselor</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><?= csrf_field() ?><input type="hidden" name="action" value="edit"><input type="hidden" name="id" value="<?= (int) $detail['id'] ?>"><div class="mb-3"><label class="form-label" for="counselor-number-<?= (int) $detail['id'] ?>">Employee number</label><input class="form-control" id="counselor-number-<?= (int) $detail['id'] ?>" name="employee_number" value="<?= e($detail['employee_number']) ?>" required></div><div class="mb-3"><label class="form-label" for="counselor-position-<?= (int) $detail['id'] ?>">Position</label><input class="form-control" id="counselor-position-<?= (int) $detail['id'] ?>" name="position_title" value="<?= e($detail['position_title']) ?>" required></div><div class="mb-3"><label class="form-label" for="counselor-specialization-<?= (int) $detail['id'] ?>">Counseling specialization</label><select class="form-select" id="counselor-specialization-<?= (int) $detail['id'] ?>" name="specialization" required><?php foreach (['Pastoral Counseling', 'Pre-Marriage Counseling', 'Marriage & Family Counseling', 'Youth Counseling', 'Grief & Bereavement Counseling'] as $specialization): ?><option value="<?= e($specialization) ?>" <?= $detail['specialization'] === $specialization ? 'selected' : '' ?>><?= e($specialization) ?></option><?php endforeach; ?></select></div><div><label class="form-label" for="counselor-credentials-<?= (int) $detail['id'] ?>">Credentials</label><input class="form-control" id="counselor-credentials-<?= (int) $detail['id'] ?>" name="credentials" value="<?= e($detail['credentials'] ?? '') ?>"></div></div><div class="modal-footer"><button class="btn btn-primary" type="submit">Save changes</button><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button></div></form></div></div></div>
 <?php endforeach; ?>
-<?php require __DIR__ . '/../../includes/footer.php'; ?>
+<?php
+$paginationTotal = $result['total'];
+$paginationPage = $page;
+$paginationPerPage = $perPage;
+$paginationFilters = [];
+$paginationLabel = 'Counselor pages';
+require __DIR__ . '/../../includes/pagination.php';
+require __DIR__ . '/../../includes/footer.php';
+?>
