@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../helpers/csrf.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../models/Personnel.php';
 require_role(['SUPER_ADMIN', 'CHURCH_ADMIN', 'STAFF']);
+$canArchiveUsers = has_role(['SUPER_ADMIN', 'CHURCH_ADMIN']);
 
 $pdo = database();
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
@@ -43,9 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $fields['username'] = trim((string) ($_POST['username'] ?? $fields['username']));
     $fields['email'] = trim((string) ($_POST['email'] ?? $fields['email']));
-    $fields['status'] = in_array((string) ($_POST['status'] ?? 'ACTIVE'), ['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'], true)
+    $postedStatus = in_array((string) ($_POST['status'] ?? 'ACTIVE'), ['ACTIVE', 'INACTIVE', 'LOCKED', 'PENDING'], true)
         ? (string) $_POST['status']
-        : 'PENDING';
+        : (string) $user['status'];
+    $fields['status'] = $canArchiveUsers ? $postedStatus : (string) $user['status'];
     $fields['roles'] = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['roles'] ?? [])), static fn (int $roleId): bool => $roleId > 0)));
     $fields['password'] = (string) ($_POST['password'] ?? '');
 
@@ -175,12 +177,18 @@ require __DIR__ . '/../../includes/breadcrumb.php';
         </div>
         <div class="col-md-6">
             <label class="form-label" for="status">Status</label>
-            <select class="form-select" id="status" name="status">
-                <option value="ACTIVE" <?= $fields['status'] === 'ACTIVE' ? 'selected' : '' ?>>ACTIVE</option>
-                <option value="INACTIVE" <?= $fields['status'] === 'INACTIVE' ? 'selected' : '' ?>>INACTIVE</option>
-                <option value="LOCKED" <?= $fields['status'] === 'LOCKED' ? 'selected' : '' ?>>LOCKED</option>
-                <option value="PENDING" <?= $fields['status'] === 'PENDING' ? 'selected' : '' ?>>PENDING</option>
-            </select>
+            <?php if ($canArchiveUsers): ?>
+                <select class="form-select" id="status" name="status">
+                    <option value="ACTIVE" <?= $fields['status'] === 'ACTIVE' ? 'selected' : '' ?>>ACTIVE</option>
+                    <option value="INACTIVE" <?= $fields['status'] === 'INACTIVE' ? 'selected' : '' ?>>INACTIVE</option>
+                    <option value="LOCKED" <?= $fields['status'] === 'LOCKED' ? 'selected' : '' ?>>LOCKED</option>
+                    <option value="PENDING" <?= $fields['status'] === 'PENDING' ? 'selected' : '' ?>>PENDING</option>
+                </select>
+            <?php else: ?>
+                <input class="form-control" id="status" value="<?= htmlspecialchars((string) $fields['status'], ENT_QUOTES, 'UTF-8') ?>" disabled>
+                <input type="hidden" name="status" value="<?= htmlspecialchars((string) $user['status'], ENT_QUOTES, 'UTF-8') ?>">
+                <div class="form-text">Only church administrators can deactivate or reactivate accounts.</div>
+            <?php endif; ?>
         </div>
     </div>
 

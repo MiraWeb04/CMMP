@@ -8,11 +8,20 @@ $suffix = strtoupper(bin2hex(random_bytes(4)));
 $eventId = null;
 $facilityId = null;
 $memberId = null;
+$createdCategoryId = null;
 
 try {
     $categoryId = $connection->query("SELECT id FROM event_categories WHERE is_active = 1 ORDER BY id LIMIT 1")->fetchColumn();
     if (!$categoryId) {
-        throw new RuntimeException('No event category is configured.');
+        $connection->prepare(
+            'INSERT INTO event_categories (name, description, is_active)
+             VALUES (:name, :description, 1)'
+        )->execute([
+            'name' => 'EVT-SMOKE-' . $suffix,
+            'description' => 'Isolated fixture for event smoke tests',
+        ]);
+        $categoryId = (int) $connection->lastInsertId();
+        $createdCategoryId = $categoryId;
     }
 
     $facilityInsert = $connection->prepare(
@@ -100,7 +109,16 @@ try {
     $deleteDeadline = $connection->prepare('DELETE FROM events WHERE id = :id');
     $deleteDeadline->execute(['id' => $deadlineEventId]);
 
+    $registrationsBeforeCancel = (int) $connection->query(
+        'SELECT COUNT(*) FROM event_registrations WHERE event_id = ' . (int) $eventId
+    )->fetchColumn();
     Event::setStatus($eventId, 'CANCELLED');
+    $registrationsAfterCancel = (int) $connection->query(
+        'SELECT COUNT(*) FROM event_registrations WHERE event_id = ' . (int) $eventId
+    )->fetchColumn();
+    if ($registrationsBeforeCancel < 1 || $registrationsAfterCancel !== $registrationsBeforeCancel) {
+        throw new RuntimeException('Cancelling an event must keep registration rows.');
+    }
     try {
         Event::register($eventId, $memberId);
         throw new RuntimeException('Registration for cancelled event was accepted.');
@@ -122,5 +140,9 @@ try {
     if ($facilityId !== null) {
         $deleteFacility = $connection->prepare('DELETE FROM facilities WHERE id = :id');
         $deleteFacility->execute(['id' => $facilityId]);
+    }
+    if (!empty($createdCategoryId)) {
+        $deleteCategory = $connection->prepare('DELETE FROM event_categories WHERE id = :id');
+        $deleteCategory->execute(['id' => $createdCategoryId]);
     }
 }

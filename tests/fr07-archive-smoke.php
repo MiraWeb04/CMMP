@@ -362,12 +362,22 @@ try {
         && !str_contains($deactivatePhp, '!Personnel::isClergy')
     );
     $userIndex = file_get_contents(__DIR__ . '/../admin/users/index.php');
+    $userEdit = file_get_contents(__DIR__ . '/../admin/users/edit.php');
+    $userAdd = file_get_contents(__DIR__ . '/../admin/users/add.php');
     fr07_ok(
         'User directory no longer hard-deletes every account',
         is_string($userIndex)
         && !str_contains($userIndex, 'DELETE FROM users WHERE id')
         && str_contains($userIndex, 'User::deactivate')
         && str_contains($userIndex, '$canArchiveUsers')
+    );
+    fr07_ok(
+        'Staff cannot change account status through the user editor',
+        is_string($userEdit)
+        && is_string($userAdd)
+        && str_contains($userEdit, '$canArchiveUsers')
+        && str_contains($userAdd, '$canArchiveUsers')
+        && str_contains($userEdit, 'Only church administrators can deactivate or reactivate accounts.')
     );
     $serviceDelete = file_get_contents(__DIR__ . '/../admin/services/delete.php');
     fr07_ok(
