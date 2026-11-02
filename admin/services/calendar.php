@@ -36,13 +36,10 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 </div>
 <div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green days are open. Red days already have confirmed church bookings. See <code>docs/scheduling-rules.md</code> in the repository for conflict rules.</span></div>
 <div class="cmmp-calendar-shell">
-    <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
+    <div id="church-calendar" data-api-url="../../api/calendar/availability.php" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>" data-initial-date="<?= e(date('Y-m-d')) ?>"></div>
     <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>
 </div>
 <div id="calendar-message" class="alert alert-danger mt-3" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-<script src="<?= e(APP_BASE_URL) ?>/assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
-<script>
-window.cmmpInitChurchCalendar({});
-</script>
+<script src="../../assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
 <?php require __DIR__ . '/../../includes/footer.php'; ?>
