@@ -141,9 +141,12 @@ final class ChurchCalendar
 
     public static function bookedDates(string $rangeStart, string $rangeEnd, ?int $facilityId = null, ?string $serviceCode = null): array
     {
+        $dates = [];
         if ($serviceCode !== null && $serviceCode !== '') {
-            $dates = [];
             foreach (self::bookingOccupiedDates($rangeStart, $rangeEnd, $facilityId, $serviceCode) as $date) {
+                $dates[$date] = true;
+            }
+            foreach (self::eventCategoryBlockedDates($serviceCode, $rangeStart, $rangeEnd) as $date) {
                 $dates[$date] = true;
             }
             ksort($dates);
@@ -151,12 +154,44 @@ final class ChurchCalendar
             return array_keys($dates);
         }
 
-        $dates = [];
         foreach (self::events($rangeStart, $rangeEnd, $facilityId) as $event) {
             self::collectDates($dates, (string) $event['start'], (string) ($event['end'] ?? $event['start']));
         }
 
         ksort($dates);
+
+        return array_keys($dates);
+    }
+
+    /**
+     * Calendar days where a published event category blocks this service type all day.
+     *
+     * @return list<string>
+     */
+    private static function eventCategoryBlockedDates(string $serviceCode, string $rangeStart, string $rangeEnd): array
+    {
+        if ($serviceCode === 'HOUSE_BLESSING') {
+            return [];
+        }
+
+        require_once __DIR__ . '/../helpers/scheduling_rules.php';
+        [$start, $end] = self::normalizeRange($rangeStart, $rangeEnd);
+        $query = database()->prepare(
+            'SELECT c.name AS category_name, e.start_datetime, e.end_datetime
+             FROM events e
+             INNER JOIN event_categories c ON c.id = e.category_id
+             WHERE e.event_status = "PUBLISHED"
+               AND e.start_datetime < :end_datetime
+               AND e.end_datetime > :start_datetime'
+        );
+        $query->execute(['start_datetime' => $start, 'end_datetime' => $end]);
+
+        $dates = [];
+        foreach ($query->fetchAll() as $row) {
+            if (scheduling_category_blocks_service((string) $row['category_name'], $serviceCode)) {
+                self::collectDates($dates, (string) $row['start_datetime'], (string) $row['end_datetime']);
+            }
+        }
 
         return array_keys($dates);
     }

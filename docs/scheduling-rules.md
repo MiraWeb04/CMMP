@@ -49,7 +49,9 @@ Staff assignment checks:
 
 ## Member flow
 
-1. Pick a date (optional) → service list shows **(Unavailable on this date)** only for types that conflict (time probe, venue, category rules).
-2. Submit → `assertAvailable()` validates exact date, time, and facility.
+1. Pick a date (optional) → if every service is still open, the form confirms the date is available on the church calendar. The service list shows **(Unavailable on this date)** only for types that conflict (time probe, venue, category rules). Other services remain requestable.
+2. The unfiltered member calendar paints a day **red** for confirmed bookings and visible church events. A green day means there is no confirmed booking on that date, not that a later venue/time choice cannot still conflict.
+3. When a specific service is selected, red days also include **event-category blocks** for that type (for example Worship blocking Facility reservation).
+4. Submit → `assertAvailable()` validates exact date, time, and facility.
 
 Administrators should run new SQL migrations after pulling updates.

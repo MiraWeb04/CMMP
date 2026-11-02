@@ -78,6 +78,7 @@ if ($preferredDate !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $preferredDate)
 $selectedNotApplicable = $code !== ''
     && $preferredDate !== ''
     && ($serviceApplicability[$code] ?? true) === false;
+$hasUnavailableServices = in_array(false, $serviceApplicability, true);
 $counselingOffice = null;
 if (in_array($code, ['PRE_MARRIAGE_COUNSELING', 'PASTORAL_COUNSELING'], true)) {
     $counselingOffice = Facility::counselingOffice();
@@ -204,7 +205,11 @@ $field = static function (array $data, string $name): string {
                 <?php endforeach; ?>
             </select>
             <?php if ($preferredDate !== ''): ?>
-                <div class="form-text">Date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. Services marked unavailable conflict with a church event or activity for that service type only. Other services may still be requested.</div>
+                <?php if ($hasUnavailableServices): ?>
+                    <div class="form-text">Date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. Services marked unavailable conflict with a church event or activity for that service type only. Other services may still be requested.</div>
+                <?php else: ?>
+                    <div class="form-text">Date: <?= e(date('F j, Y', strtotime($preferredDate))) ?>. This date is open on the church calendar. You can request any service.</div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
         <?php if ($preferredDate !== ''): ?>
