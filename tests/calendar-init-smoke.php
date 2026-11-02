@@ -54,5 +54,12 @@ cal_ok(
     && str_contains($js, 'dataset.requestUrl')
 );
 
+$request = (string) file_get_contents(__DIR__ . '/../member/services/request.php');
+cal_ok(
+    'Open calendar dates do not use the unavailable-service explanation',
+    str_contains($request, '$hasUnavailableServices')
+    && str_contains($request, 'This date is open on the church calendar')
+);
+
 echo "Passed: {$passed}; Failed: {$failed}\n";
 exit($failed === 0 ? 0 : 1);
