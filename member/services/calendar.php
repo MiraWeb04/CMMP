@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../models/ServiceRequest.php';
 require_role('MEMBER');
 $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT) ?: (int) date('Y');
 $year = max(2000, min(2100, $year));
+$initialDate = ((int) date('Y') === $year) ? date('Y-m-d') : sprintf('%04d-01-01', $year);
 $serviceTypeId = filter_input(INPUT_GET, 'service_type_id', FILTER_VALIDATE_INT) ?: null;
 $serviceCode = '';
 foreach (ServiceRequest::types() as $type) {
@@ -46,38 +47,10 @@ require __DIR__ . '/../../includes/breadcrumb.php';
 </div>
 <div class="cmmp-calendar-note"><i class="fa-solid fa-circle-info"></i><span>Green = open for this service. Red = confirmed booking. Orange entries = pending requests (informational). Published church events are shown; pick a time that does not overlap.</span></div>
 <div class="cmmp-calendar-shell">
-    <div id="church-calendar" data-api-url="<?= e(APP_BASE_URL) ?>/api/calendar/availability.php" data-request-url="request.php" data-service-type-id="<?= $serviceTypeId ? (int) $serviceTypeId : '' ?>" data-service-code="<?= e($serviceCode) ?>" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>"></div>
+    <div id="church-calendar" data-api-url="../../api/calendar/availability.php" data-request-url="request.php" data-service-type-id="<?= $serviceTypeId ? (int) $serviceTypeId : '' ?>" data-service-code="<?= e($serviceCode) ?>" data-facility-id="<?= $selectedFacilityId ? (int) $selectedFacilityId : '' ?>" data-initial-date="<?= e($initialDate) ?>"></div>
     <?php require __DIR__ . '/../../includes/calendar-legend.php'; ?>
 </div>
 <div id="calendar-message" class="alert alert-danger mt-3" hidden></div>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
-<script src="<?= e(APP_BASE_URL) ?>/assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
-<script>
-(() => {
-    const element = document.getElementById('church-calendar');
-    const serviceTypeId = element?.dataset.serviceTypeId;
-    const requestUrl = element?.dataset.requestUrl;
-    window.cmmpInitChurchCalendar({
-        initialDate: '<?= e((string) $year) ?>-01-01',
-        onDateClick: (info, calendar, bookedDates) => {
-            const today = new Date().toISOString().slice(0, 10);
-            if (info.dateStr < today) {
-                return;
-            }
-            if (bookedDates.has(info.dateStr) && !confirm('This date already has a confirmed booking for this venue or service. Continue with a different time?')) {
-                return;
-            }
-            const query = new URLSearchParams({preferred_date: info.dateStr});
-            if (serviceTypeId) {
-                query.set('service_type_id', serviceTypeId);
-            }
-            const facility = document.getElementById('calendar-facility');
-            if (facility?.value) {
-                query.set('preferred_facility_id', facility.value);
-            }
-            window.location.href = requestUrl + '?' + query.toString();
-        },
-    });
-})();
-</script>
+<script src="../../assets/js/church-calendar.js?v=<?= (int) filemtime(__DIR__ . '/../../assets/js/church-calendar.js') ?>"></script>
 <?php require __DIR__ . '/../../includes/footer.php'; ?>

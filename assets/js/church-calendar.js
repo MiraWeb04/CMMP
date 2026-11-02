@@ -1,21 +1,68 @@
 (() => {
+    const localDateStr = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const showMessage = (message, text) => {
+        if (!message) {
+            return;
+        }
+        message.textContent = text;
+        message.hidden = false;
+    };
+
+    const hideMessage = (message) => {
+        if (!message) {
+            return;
+        }
+        message.hidden = true;
+        message.textContent = '';
+    };
+
+    const memberDateClick = (info, calendar, bookedDates, element) => {
+        const today = localDateStr(new Date());
+        if (info.dateStr < today) {
+            return;
+        }
+        if (bookedDates.has(info.dateStr) && !window.confirm('This date already has a confirmed booking for this venue or service. Continue with a different time?')) {
+            return;
+        }
+        const requestUrl = element.dataset.requestUrl;
+        if (!requestUrl) {
+            return;
+        }
+        const query = new URLSearchParams({preferred_date: info.dateStr});
+        if (element.dataset.serviceTypeId) {
+            query.set('service_type_id', element.dataset.serviceTypeId);
+        }
+        const facility = document.getElementById('calendar-facility');
+        if (facility?.value) {
+            query.set('preferred_facility_id', facility.value);
+        }
+        window.location.href = requestUrl + '?' + query.toString();
+    };
+
     window.cmmpInitChurchCalendar = function cmmpInitChurchCalendar(options) {
-        const element = document.getElementById(options.elementId || 'church-calendar');
-        const facility = document.getElementById(options.facilityId || 'calendar-facility');
-        const message = document.getElementById(options.messageId || 'calendar-message');
-        if (!element || !window.FullCalendar) {
+        const settings = options || {};
+        const element = document.getElementById(settings.elementId || 'church-calendar');
+        const facility = document.getElementById(settings.facilityId || 'calendar-facility');
+        const message = document.getElementById(settings.messageId || 'calendar-message');
+        if (!element) {
+            return null;
+        }
+        if (element.dataset.calendarReady === '1') {
+            return element._cmmpCalendar || null;
+        }
+        if (!window.FullCalendar) {
+            showMessage(message, 'The calendar could not be loaded. Refresh the page, or check that the FullCalendar script is allowed.');
             return null;
         }
 
         let bookedDates = new Set();
         let calendar = null;
-
-        const localDateStr = (date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
 
         const applyDayStyles = () => {
             element.querySelectorAll('.fc-daygrid-day').forEach((cell) => {
@@ -35,9 +82,15 @@
             });
         };
 
+        const onDateClick = typeof settings.onDateClick === 'function'
+            ? settings.onDateClick
+            : (element.dataset.requestUrl
+                ? (info, currentCalendar, dates) => memberDateClick(info, currentCalendar, dates, element)
+                : null);
+
         calendar = new FullCalendar.Calendar(element, {
             initialView: window.innerWidth < 768 ? 'listMonth' : 'dayGridMonth',
-            initialDate: options.initialDate || undefined,
+            initialDate: settings.initialDate || element.dataset.initialDate || undefined,
             height: 'auto',
             fixedWeekCount: false,
             dayMaxEvents: 3,
@@ -45,7 +98,7 @@
             firstDay: 0,
             displayEventTime: true,
             eventTimeFormat: {hour: 'numeric', minute: '2-digit', meridiem: 'short'},
-            headerToolbar: options.headerToolbar || {left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth'},
+            headerToolbar: settings.headerToolbar || {left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth'},
             events: (info, success, failure) => {
                 const query = new URLSearchParams({start: info.startStr, end: info.endStr});
                 if (element.dataset.serviceTypeId) {
@@ -56,6 +109,8 @@
                 }
                 if (facility && facility.value) {
                     query.set('facility_id', facility.value);
+                } else if (element.dataset.facilityId) {
+                    query.set('facility_id', element.dataset.facilityId);
                 }
                 fetch(element.dataset.apiUrl + '?' + query.toString(), {headers: {Accept: 'application/json'}})
                     .then((response) => response.json().then((data) => ({response, data})))
@@ -65,16 +120,11 @@
                         }
                         bookedDates = new Set(data.bookedDates || []);
                         success(data.events || []);
-                        if (message) {
-                            message.hidden = true;
-                        }
+                        hideMessage(message);
                         window.requestAnimationFrame(applyDayStyles);
                     })
                     .catch((error) => {
-                        if (message) {
-                            message.textContent = error.message;
-                            message.hidden = false;
-                        }
+                        showMessage(message, error.message || 'Calendar data could not be loaded.');
                         failure(error);
                     });
             },
@@ -96,14 +146,15 @@
             },
             eventClick: (info) => {
                 info.jsEvent.preventDefault();
-                const details = info.event.extendedProps;
-                alert(details.type + ': ' + info.event.title.replace(details.type + ': ', '') + '\n' + info.event.start.toLocaleString());
+                const details = info.event.extendedProps || {};
+                const type = details.type || 'Booking';
+                alert(type + ': ' + info.event.title.replace(type + ': ', '') + '\n' + info.event.start.toLocaleString());
             },
             dateClick: (info) => {
-                if (typeof options.onDateClick !== 'function') {
+                if (typeof onDateClick !== 'function') {
                     return;
                 }
-                options.onDateClick(info, calendar, bookedDates);
+                onDateClick(info, calendar, bookedDates);
             },
         });
 
@@ -112,7 +163,21 @@
         }
 
         calendar.render();
+        element.dataset.calendarReady = '1';
+        element._cmmpCalendar = calendar;
         window.requestAnimationFrame(applyDayStyles);
         return calendar;
     };
+
+    const start = () => {
+        if (document.getElementById('church-calendar')) {
+            window.cmmpInitChurchCalendar({});
+        }
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+    } else {
+        start();
+    }
 })();
